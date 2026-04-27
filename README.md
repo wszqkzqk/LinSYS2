@@ -1,10 +1,11 @@
 # LinSYS2
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2+-blue.svg)](COPYING)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wszqkzqk/LinSYS2)
 
 **Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem. No VM. No dual-boot. No containers.**
 
-LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux — not a cross-compiler port, but the **actual Windows GCC, GDB, CMake, and libraries** from MSYS2 repositories, running through [Wine](https://www.winehq.org/). You are building Windows binaries with the same toolchain that runs on Windows. Not a Linux port that behaves differently.
+LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux — the **actual Windows toolchain and libraries** from MSYS2 repositories, running through [Wine](https://www.winehq.org/). You are building Windows binaries with the same toolchain that runs on Windows. Not a Linux port that behaves differently.
 
 ---
 
@@ -18,7 +19,7 @@ linsys2-pacman -Sy mingw-w64-ucrt-x86_64-gcc
 linsys2 run -- gcc -v
 ```
 
-Two commands. You just installed and ran a Windows program without leaving Linux.
+Two commands. You just installed and ran a Windows program without leaving Linux!
 
 ---
 
@@ -41,7 +42,7 @@ LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB
 
 ## Features
 
-- **Same toolchain as Windows** — install the actual Windows GCC, GDB, and CMake. Not a Linux cross-compiler port. Identical libraries. Identical behavior. Identical binaries.
+- **Same toolchain as Windows** — install the actual Windows GCC/LLVM, GDB/LLDB, and CMake/Meson, etc. Not a Linux cross-compiler port. Identical libraries. Identical behavior. Identical binaries.
 - **Full dev lifecycle on Linux** — install packages, compile, debug, run tests, and ship Windows binaries, all from your Linux shell
 - **No VM, no containers** — runs through Wine at near-native speed
 - **User-level isolation** — everything lives in `~/.local/share/linsys2/`. No root, no system conflicts
@@ -67,6 +68,18 @@ Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https:/
 ## Installation
 
 ### Arch Linux
+
+**From AUR** (recommended):
+
+```bash
+# Using yay
+yay -S linsys2
+
+# Or using paru
+paru -S linsys2
+```
+
+**Build manually**:
 
 ```bash
 git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
