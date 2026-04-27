@@ -19,7 +19,7 @@ PACMAN_CFLAGS = -DMSYS2_PACMAN_LINUX
 
 all: build
 
-$(SUBMODULE)/.git $(KEYRING_SUBMODULE)/.git:
+$(SUBMODULE)/.git $(KEYRING_SUBMODULE)/.git &:
 	git submodule update --init --recursive
 
 checkout: $(SUBMODULE)/.git $(KEYRING_SUBMODULE)/.git
