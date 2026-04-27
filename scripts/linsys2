@@ -10,7 +10,7 @@ import platform
 from pathlib import Path
 
 # Configuration
-DATA_DIR = Path.home() / ".local" / "share" / "linsys2-pacman"
+DATA_DIR = Path.home() / ".local" / "share" / "linsys2"
 
 # Supported environments (must match linsys2-pacman)
 ENVIRONMENTS = {

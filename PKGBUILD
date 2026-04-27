@@ -3,7 +3,7 @@
 pkgname=linsys2
 pkgver=r0.00000000.0000000
 pkgrel=1
-pkgdesc='Build Windows programs with full MSYS2 ecosystem on Linux. No VM. No dual-boot. No containers.'
+pkgdesc='Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem. No VM. No dual-boot. No containers.'
 arch=('x86_64' 'aarch64' 'riscv64' 'loong64')
 url='https://github.com/wszqkzqk/LinSYS2'
 license=('GPL-2.0-or-later')

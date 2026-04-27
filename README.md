@@ -2,44 +2,11 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2+-blue.svg)](COPYING)
 
-**Build Windows programs with full MSYS2 ecosystem on Linux. No VM. No dual-boot. No containers.**
+**Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem. No VM. No dual-boot. No containers.**
 
-LinSYS2 brings the [MSYS2](https://www.msys2.org/) package ecosystem to Linux. Install thousands of native Windows libraries and tools directly from MSYS2 repositories, cross-compile Windows executables, and run them through [Wine](https://www.winehq.org/) — all from your Linux terminal.
-
----
-
-## Features
-
-- **Full MSYS2 ecosystem** — thousands of packages: GCC, Clang, CMake, Qt, OpenSSL, FFmpeg, and more
-- **No VM, no emulation** — programs run through Wine at near-native speed
-- **User-level isolation** — everything lives in `~/.local/share/`. No root, no system conflicts
-- **Cross-compilation from Linux** — build Windows executables, DLLs, and libraries in your CI/CD pipelines
-- **Multi-target** — ucrt64, clang64, and clangarm64 environments from a single machine
+LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux — not a cross-compiler port, but the **actual Windows GCC, GDB, CMake, and libraries** from MSYS2 repositories, running through [Wine](https://www.winehq.org/). You are building Windows binaries with the same toolchain that runs on Windows. Not a Linux port that behaves differently.
 
 ---
-
-## How It Works
-
-LinSYS2 has two commands:
-
-| Command | Purpose |
-|---------|---------|
-| `linsys2-pacman` | Package management — install, remove, and upgrade Windows packages from MSYS2 repos |
-| `linsys2` | Wine integration — run programs, manage PATH registration, inspect environments |
-
-Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages go to `~/.local/share/linsys2-pacman/`. `linsys2` manages Wine prefixes and PATH so programs just work.
-
----
-
-## Installation
-
-### Arch Linux
-
-```bash
-git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
-cd LinSYS2
-makepkg -si
-```
 
 ## Quick Start
 
@@ -54,6 +21,58 @@ linsys2 run -- gcc -v
 Two commands. You just installed and ran a Windows program without leaving Linux.
 
 ---
+
+## Why LinSYS2
+
+Traditional cross-compilation installs a Linux port of the MinGW toolchain. You compile with it, but the build process differs from Windows — and you cannot run or debug the result.
+
+LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB. Same build process. You compile, debug, and run exactly as you would on Windows — from your Linux shell.
+
+| | Traditional Cross-Compile | LinSYS2 |
+|---|---|---|
+| Build toolchain | Linux port of MinGW | Windows GCC from MSYS2 |
+| Build behavior | May differ from Windows | Identical to Windows |
+| Run binaries | No | Yes (through Wine) |
+| Debug with Windows GDB | No | Yes |
+| Libraries | Linux-distro packaged | Identical to Windows |
+| Package manager | Distro or manual | MSYS2 pacman |
+
+---
+
+## Features
+
+- **Same toolchain as Windows** — install the actual Windows GCC, GDB, and CMake. Not a Linux cross-compiler port. Identical libraries. Identical behavior. Identical binaries.
+- **Full dev lifecycle on Linux** — install packages, compile, debug, run tests, and ship Windows binaries, all from your Linux shell
+- **No VM, no containers** — runs through Wine at near-native speed
+- **User-level isolation** — everything lives in `~/.local/share/linsys2/`. No root, no system conflicts
+- **Multi-target** — ucrt64, clang64, and clangarm64 from a single machine
+
+---
+
+## How It Works
+
+LinSYS2 has two commands:
+
+| Command | Purpose |
+|---------|---------|
+| `linsys2-pacman` | Package management — install, remove, and upgrade Windows packages from MSYS2 repos |
+| `linsys2` | Wine integration — run programs, manage PATH registration, inspect environments |
+
+Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages install to `~/.local/share/linsys2/`.
+
+`linsys2 run` uses an isolated Wine prefix and injects the environment via `WINEPATH` — no setup, no registry changes, no pollution of your existing `~/.wine`. If you prefer, `linsys2 register` adds the environment to your existing Wine installation instead.
+
+---
+
+## Installation
+
+### Arch Linux
+
+```bash
+git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
+cd LinSYS2
+makepkg -si
+```
 
 ### Other distributions
 
@@ -71,8 +90,6 @@ make && sudo make PREFIX=/usr install
 ## Usage
 
 ### Package Management (`linsys2-pacman`)
-
-`linsys2-pacman` is a transparent pacman wrapper. All standard pacman operations work:
 
 ```bash
 # Sync databases and upgrade
@@ -94,32 +111,43 @@ linsys2-pacman -Q
 linsys2-pacman --env clang64 -S mingw-w64-clang-x86_64-llvm
 ```
 
-### Running Windows Programs (`linsys2`)
+### Build, Debug, Run (`linsys2`)
+
+#### Isolated WINEPREFIX (Recommended)
+
+`linsys2 run` works out of the box. It uses an isolated Wine prefix under `~/.local/share/linsys2/` and injects the environment's bin directory via `WINEPATH` — no prior setup, no registry changes, no pollution of your existing Wine installation.
 
 ```bash
-# One-time: initialize Wine prefix (auto-registers bin to PATH)
-linsys2 init
+# Compile a Windows executable with Windows GCC
+linsys2 run -- gcc -o app.exe app.c
 
-# Run a program from the installed environment
-linsys2 run -- gcc --version
+# Debug it with Windows GDB
+linsys2 run -- gdb app.exe
 
+# Build a CMake project the Windows way
+linsys2 run -- cmake -B build -S .
+linsys2 run -- cmake --build build
+
+# Run any installed Windows program
+linsys2 run -- python --version
 # Run your own Windows executable
-linsys2 run -- ./my-app.exe --some-flag
+linsys2 run -- ./example.exe --your-flags
 
-# Register bin directory to your existing Wine installation
-linsys2 register
-
-# Start an interactive shell with the Windows environment in PATH
+# Or drop into a shell where all Windows tools are in PATH
 linsys2 shell
-
-# Inspect environment and PATH registration
-linsys2 env
-
-# Remove from Wine PATH
-linsys2 unregister
 ```
 
-> **Recommend to use `--`** to separate `linsys2` options from the program's own flags. This prevents conflicts like `-E` (preprocessor flag) vs. the `--env` option.
+> **Always use `--`** to separate `linsys2` options from the program's own flags.
+
+#### Existing Wine Integration
+
+Your **existing** Wine environment (`~/.wine` or `$WINEPREFIX`) is also supported:
+
+```bash
+linsys2 register    # add bin directory to your Wine PATH registry
+linsys2 env         # inspect registration
+linsys2 unregister  # remove from Wine PATH
+```
 
 ---
 
@@ -137,7 +165,8 @@ The default is auto-detected from your CPU. Override with `--env`.
 
 ## License
 
-[GPL v2 or later](COPYING). The pacman binaries are built from [MSYS2 pacman](https://github.com/msys2/msys2-pacman) sources with additional patches, also GPL v2+.
+* [GPL v2 or later](COPYING).
+* The pacman binaries are built from [MSYS2 pacman](https://github.com/msys2/msys2-pacman) sources with additional patches, also GPL v2+.
 
 ---
 

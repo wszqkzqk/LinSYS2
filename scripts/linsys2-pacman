@@ -9,8 +9,8 @@ from pathlib import Path
 
 # Configuration
 PROJECT_NAME = "LinSYS2"
-CONFIG_DIR = Path.home() / ".config" / "linsys2-pacman"
-DATA_DIR = Path.home() / ".local" / "share" / "linsys2-pacman"
+CONFIG_DIR = Path.home() / ".config" / "linsys2"
+DATA_DIR = Path.home() / ".local" / "share" / "linsys2"
 
 # Derive private prefix from wrapper location.
 # Wrapper is at <prefix>/bin/linsys2-pacman
