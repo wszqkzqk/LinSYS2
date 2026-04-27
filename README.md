@@ -30,7 +30,7 @@ LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB
 
 | | Traditional Cross-Compile | LinSYS2 |
 |---|---|---|
-| Build toolchain | Linux port of MinGW | Windows GCC from MSYS2 |
+| Build toolchain | Linux port of MinGW | Windows Compiler from MSYS2 |
 | Build behavior | May differ from Windows | Identical to Windows |
 | Run binaries | No | Yes (through Wine) |
 | Debug with Windows GDB | No | Yes |

@@ -1,0 +1,13 @@
+*.pkg.*
+*.pyc
+*.pyo
+*.pyd
+
+linsys2/*
+pkg/*
+src/*
+__pycache__/
+
+# Ignore local AGENT/LLM-generated docs and scratch markdown notes
+/*.md
+!/README.md
