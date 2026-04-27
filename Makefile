@@ -15,7 +15,7 @@ KEYRING_DIR = $(DESTDIR)$(PRIVATE_PREFIX)/share/pacman/keyrings
 PRIVATE_PREFIX = $(PREFIX)/lib/linsys2-pacman
 PACMAN_CFLAGS = -DMSYS2_PACMAN_LINUX
 
-.PHONY: all build install clean checkout bump-submodule bump-keyring
+.PHONY: all build configure install clean checkout bump-submodule bump-keyring
 
 all: build
 
@@ -64,13 +64,13 @@ install:
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2-revoked $(KEYRING_DIR)/msys2-revoked
 	install -Dm755 scripts/linsys2-pacman $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
 	install -Dm755 scripts/linsys2 $(DESTDIR)$(PREFIX)/bin/linsys2
-	install -Dm644 configs/pacman.conf.template $(DESTDIR)$(PREFIX)/share/linsys2-pacman/pacman.conf.template
 	install -Dm644 README.md $(DESTDIR)$(PREFIX)/share/doc/linsys2-pacman/README.md
 	install -Dm644 COPYING $(DESTDIR)$(PREFIX)/share/licenses/linsys2-pacman/COPYING
 
 clean:
 	@cd $(SUBMODULE) && rm -rf build
 	@cd $(SUBMODULE) && git checkout -- .
+	@rm -f $(PATCH_STAMP)
 
 bump-submodule: $(SUBMODULE)/.git
 ifndef SUBMODULE_VERSION

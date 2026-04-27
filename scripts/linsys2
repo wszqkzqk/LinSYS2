@@ -219,7 +219,7 @@ def cmd_register(args):
 
     if not bin_dir.exists():
         warn(f"Bin directory not found: {bin_dir}")
-        warn("Install some packages first: linsys2-pacman --env {env_name} -S ...")
+        warn(f"Install some packages first: linsys2-pacman --env {env_name} -S ...")
         return 1
 
     ensure_wine()
@@ -304,11 +304,12 @@ def cmd_env(args):
 
     print(f"\nWine PATH:")
     registered = False
+    norm_win_bin = _normalize_wine_path(win_bin_path)
     for i, p in enumerate(current_path.split(";"), 1):
         if p.strip():
-            marker = "  *" if p.strip().lower() == win_bin_path.lower() else "   "
+            marker = "  *" if _normalize_wine_path(p) == norm_win_bin else "   "
             print(f"{marker} {i}. {p.strip()}")
-            if p.strip().lower() == win_bin_path.lower():
+            if _normalize_wine_path(p) == norm_win_bin:
                 registered = True
 
     print(f"\nRegistration status: {'registered' if registered else 'not registered'}")
@@ -395,7 +396,8 @@ def cmd_shell(args):
     env["WINEPREFIX"] = str(wineprefix)
 
     if bin_dir.exists():
-        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        old_path = env.get("PATH")
+        env["PATH"] = f"{bin_dir}" + (":" + old_path if old_path else "")
         try:
             wine_lib_path = subprocess.run(
                 ["winepath", "-w", str(bin_dir)],
@@ -465,7 +467,7 @@ Usage:
     Options must appear before the program name.
     Use '--' if the program itself takes options starting with '-'.
     Examples:
-      linsys2 run gcc --version
+      linsys2 run -- gcc --version
       linsys2 run --env clang64 -- clang -E file.c
 
   linsys2 shell [--env ENV] [--prefix WINEPREFIX]
@@ -476,22 +478,23 @@ Environments: ucrt64, clang64, clangarm64 (default: ucrt64)
 
 
 def main():
+    argv = sys.argv[1:]
+
+    if argv and argv[0] in ("-v", "--version"):
+        print("linsys2 development")
+        return 0
+
     parser = argparse.ArgumentParser(
         prog="linsys2",
         description="Wine integration for LinSYS2 mingw-w64 environments",
         add_help=False
     )
     parser.add_argument("-h", "--help", action="store_true")
-    parser.add_argument("-v", "--version", action="store_true")
 
     args, remaining = parser.parse_known_args()
 
     if args.help or not remaining:
         show_help()
-        return 0
-
-    if args.version:
-        print("linsys2 0.1.0")
         return 0
 
     subcommand = remaining[0]

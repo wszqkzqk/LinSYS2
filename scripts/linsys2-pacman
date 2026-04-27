@@ -4,7 +4,6 @@
 import os
 import sys
 import subprocess
-import shutil
 import platform
 from pathlib import Path
 
@@ -57,7 +56,7 @@ MSYS2_MIRRORS = [
 ]
 
 # LinSYS2-specific subcommands
-LINSYS2_SUBCOMMANDS = {"init", "run", "shell", "update-keyring"}
+LINSYS2_SUBCOMMANDS = {"init", "update-keyring"}
 
 
 def info(msg):
@@ -100,11 +99,13 @@ def get_pacman_env():
     env["MSYS2_PACMAN_LINUX"] = "1"
 
     if LIBALPM_DIR.exists():
-        env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + ":" + env.get("LD_LIBRARY_PATH", "")
+        old = env.get("LD_LIBRARY_PATH")
+        env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + (":" + old if old else "")
 
     bin_dir = _PRIVATE_PREFIX / "bin"
     if bin_dir.exists():
-        env["PATH"] = str(bin_dir) + ":" + env.get("PATH", "")
+        old = env.get("PATH")
+        env["PATH"] = str(bin_dir) + (":" + old if old else "")
 
     return env
 
@@ -155,6 +156,7 @@ def create_config(env_name):
     # Create subdirectories
     (env_dir / "var" / "lib" / "pacman").mkdir(parents=True, exist_ok=True)
     (env_dir / "var" / "cache" / "pacman" / "pkg").mkdir(parents=True, exist_ok=True)
+    (env_dir / "var" / "log").mkdir(parents=True, exist_ok=True)
     (env_dir / "etc" / "pacman.d" / "hooks").mkdir(parents=True, exist_ok=True)
     (env_dir / env_cfg["install_prefix"].lstrip("/")).mkdir(parents=True, exist_ok=True)
 
@@ -214,7 +216,7 @@ def parse_env_arg(args):
         if skip_next:
             skip_next = False
             continue
-        if arg in ("--env", "-e"):
+        if arg == "--env":
             if i + 1 < len(args):
                 env_name = args[i + 1]
                 skip_next = True
@@ -236,12 +238,12 @@ def show_help():
 
 Usage:
   linsys2-pacman [pacman-options...]
-    Run pacman commands directly. Defaults to ucrt64 environment.
+    Run pacman commands directly. Defaults to {DEFAULT_ENV} environment.
     Examples:
-      linsys2-pacman -Syu               # Upgrade ucrt64 packages
-      linsys2-pacman -S gcc             # Install gcc in ucrt64
-      linsys2-pacman -R gcc             # Remove gcc from ucrt64
-      linsys2-pacman -Q                 # List ucrt64 installed packages
+      linsys2-pacman -Syu               # Upgrade packages
+      linsys2-pacman -S gcc             # Install a package
+      linsys2-pacman -R gcc             # Remove a package
+      linsys2-pacman -Q                 # List installed packages
       linsys2-pacman -Ss search         # Search packages
 
   linsys2-pacman --env ENV [pacman-options...]
@@ -250,12 +252,8 @@ Usage:
   linsys2-pacman init [--env ENV] [--force]
     Initialize a new environment.
 
-  linsys2-pacman run [--env ENV] PROGRAM [args...]
-    Run a Windows program through Wine.
-    Example: linsys2-pacman run gcc --version
-
-  linsys2-pacman shell [--env ENV]
-    Start a shell with the environment PATH set.
+  linsys2-pacman update-keyring [--env ENV]
+    Refresh the pacman keyring.
 
 Environments: {', '.join(ENVIRONMENTS.keys())} (default: {DEFAULT_ENV})
 """)
@@ -281,7 +279,7 @@ def cmd_init(args):
                 response = "n"
             if response.lower() not in ("y", "yes"):
                 info("Aborted")
-                return 0
+                return 1
 
     create_config(env_name)
 
@@ -292,78 +290,15 @@ def cmd_init(args):
 
     try:
         subprocess.run([pacman_key, "--config", str(config_file), "--init"],
-                       env=env, check=True, capture_output=True)
+                       env=env, check=True)
         subprocess.run([pacman_key, "--config", str(config_file), "--populate", "msys2"],
-                       env=env, check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        warn("pacman-key initialization failed. You may need to run 'linsys2-pacman init --force'.")
+                       env=env, check=True)
+    except subprocess.CalledProcessError as e:
+        error(f"pacman-key initialization failed: {e}")
+        return 1
 
     info(f"Environment {env_name} initialized successfully")
     return 0
-
-
-def cmd_run(args):
-    """Run a program through Wine."""
-    # args format: ["--env", "ucrt64", "gcc", "--version"]
-    env_name, remaining = parse_env_arg(args)
-
-    if not remaining:
-        error("Missing program name")
-        return 1
-
-    program = remaining[0]
-    program_args = remaining[1:]
-
-    env_cfg = get_env_config(env_name)
-    env_dir = get_env_dir(env_name)
-
-    bin_dir = env_dir / env_cfg["install_prefix"].lstrip("/") / "bin"
-
-    if "/" not in program:
-        if not bin_dir.exists():
-            error(f"No packages installed for {env_name}")
-            error(f"Run: linsys2-pacman init --env {env_name}")
-            error(f"Then: linsys2-pacman --env {env_name} -S <package>")
-            return 1
-
-        if not program.endswith(".exe"):
-            program = program + ".exe"
-
-        program_path = bin_dir / program
-        if not program_path.exists():
-            error(f"Program not found: {program}")
-            error(f"Searched in: {bin_dir}")
-            return 1
-    else:
-        program_path = Path(program)
-
-    wine_cmd = ["wine", str(program_path)] + program_args
-    return subprocess.run(wine_cmd).returncode
-
-
-def cmd_shell(args):
-    """Start a shell with the environment PATH set."""
-    env_name, _ = parse_env_arg(args)
-    env_cfg = get_env_config(env_name)
-    env_dir = get_env_dir(env_name)
-
-    bin_dir = env_dir / env_cfg["install_prefix"].lstrip("/") / "bin"
-
-    if not bin_dir.exists():
-        warn(f"No packages installed for {env_name}")
-        warn(f"Run: linsys2-pacman init --env {env_name}")
-        warn(f"Then: linsys2-pacman --env {env_name} -S <package>")
-
-    env = os.environ.copy()
-    if bin_dir.exists():
-        env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["MSYS2_PACMAN_LINUX"] = "1"
-
-    shell = os.environ.get("SHELL", "/bin/bash")
-    info(f"Starting shell with {env_name} in PATH...")
-    info(f"Type 'exit' to leave the environment")
-
-    return subprocess.run([shell], env=env).returncode
 
 
 def cmd_update_keyring(args):
@@ -417,10 +352,6 @@ def main():
         sub_args = args[1:]
         if subcommand == "init":
             return cmd_init(sub_args)
-        elif subcommand == "run":
-            return cmd_run(sub_args)
-        elif subcommand == "shell":
-            return cmd_shell(sub_args)
         elif subcommand == "update-keyring":
             return cmd_update_keyring(sub_args)
 
