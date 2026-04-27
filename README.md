@@ -1,5 +1,9 @@
 # LinSYS2
 
+<div align="center">
+  <img src="icon.png" alt="LinSYS2" width="450">
+</div>
+
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2+-blue.svg)](COPYING)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wszqkzqk/LinSYS2)
 
