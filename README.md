@@ -3,7 +3,9 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2+-blue.svg)](COPYING)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wszqkzqk/LinSYS2)
 
-**Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem. No VM. No dual-boot. No containers.**
+**Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem.**
+
+**No VM. No dual-boot. No containers.**
 
 LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux — the **actual Windows toolchain and libraries** from MSYS2 repositories, running through [Wine](https://www.winehq.org/). You are building Windows binaries with the same toolchain that runs on Windows. Not a Linux port that behaves differently.
 
@@ -168,9 +170,9 @@ linsys2 unregister  # remove from Wine PATH
 
 | Name | Compiler | Default On |
 |------|----------|-----------|
-| `ucrt64` | GCC (UCRT) | x86_64 |
-| `clang64` | Clang (UCRT) | — |
-| `clangarm64` | Clang (UCRT) | ARM64 |
+| `ucrt64` | GCC and Clang | x86_64 |
+| `clang64` | Clang Only | — |
+| `clangarm64` | Clang Only | ARM64 |
 
 The default is auto-detected from your CPU. Override with `--env`.
 
