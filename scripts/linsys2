@@ -36,6 +36,11 @@ else:
     DEFAULT_ENV = "ucrt64"
 
 
+def _get_version():
+    v = "@VERSION@"
+    return v if not v.startswith("@") else "development"
+
+
 def info(msg):
     print(f"\033[0;32m[INFO]\033[0m {msg}")
 
@@ -481,7 +486,7 @@ def main():
     argv = sys.argv[1:]
 
     if argv and argv[0] in ("-v", "--version"):
-        print("linsys2 development")
+        print(f"linsys2 {_get_version()}")
         return 0
 
     parser = argparse.ArgumentParser(

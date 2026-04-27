@@ -15,6 +15,16 @@ KEYRING_DIR = $(DESTDIR)$(PRIVATE_PREFIX)/share/pacman/keyrings
 PRIVATE_PREFIX = $(PREFIX)/lib/linsys2-pacman
 PACMAN_CFLAGS = -DMSYS2_PACMAN_LINUX
 
+VERSION := $(shell \
+	count=$$(git rev-list --count HEAD 2>/dev/null); \
+	date=$$(git log -1 --format=%cd --date=format:%Y%m%d 2>/dev/null); \
+	hash=$$(git rev-parse --short HEAD 2>/dev/null); \
+	if [ -n "$$count" ] && [ -n "$$date" ] && [ -n "$$hash" ]; then \
+		printf "r%s.%s.%s" "$$count" "$$date" "$$hash"; \
+	else \
+		echo "unknown"; \
+	fi)
+
 .PHONY: all build configure install clean checkout bump-submodule bump-keyring
 
 all: build
@@ -62,8 +72,11 @@ install:
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2.gpg $(KEYRING_DIR)/msys2.gpg
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2-trusted $(KEYRING_DIR)/msys2-trusted
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2-revoked $(KEYRING_DIR)/msys2-revoked
-	install -Dm755 scripts/linsys2-pacman $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
-	install -Dm755 scripts/linsys2 $(DESTDIR)$(PREFIX)/bin/linsys2
+	@mkdir -p $(DESTDIR)$(PREFIX)/bin
+	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2-pacman > $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
+	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
+	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2 > $(DESTDIR)$(PREFIX)/bin/linsys2
+	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2
 	install -Dm644 README.md $(DESTDIR)$(PREFIX)/share/doc/linsys2-pacman/README.md
 	install -Dm644 COPYING $(DESTDIR)$(PREFIX)/share/licenses/linsys2-pacman/COPYING
 

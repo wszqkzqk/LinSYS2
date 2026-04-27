@@ -59,6 +59,11 @@ MSYS2_MIRRORS = [
 LINSYS2_SUBCOMMANDS = {"init", "update-keyring"}
 
 
+def _get_version():
+    v = "@VERSION@"
+    return v if not v.startswith("@") else "development"
+
+
 def info(msg):
     print(f"\033[0;32m[INFO]\033[0m {msg}")
 
@@ -344,7 +349,7 @@ def main():
         return 0
 
     if args[0] in ("-V", "--version"):
-        print(f"{PROJECT_NAME} pacman wrapper")
+        print(f"{PROJECT_NAME} pacman wrapper {_get_version()}")
         return 0
 
     if args[0] in LINSYS2_SUBCOMMANDS:
