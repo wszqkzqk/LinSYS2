@@ -1,0 +1,102 @@
+diff --git a/lib/libalpm/add.c b/lib/libalpm/add.c
+index c21c884d..4ae71861 100644
+--- a/lib/libalpm/add.c
++++ b/lib/libalpm/add.c
+@@ -115,7 +115,7 @@ static int perform_extraction(alpm_handle_t *handle, struct archive *archive,
+ {
+ 	int ret;
+ 	struct archive *archive_writer;
+-	const int archive_flags = ARCHIVE_EXTRACT_OWNER |
++	const int archive_flags = (geteuid() == 0 ? ARCHIVE_EXTRACT_OWNER : 0) |
+ 	                          ARCHIVE_EXTRACT_PERM |
+ 	                          ARCHIVE_EXTRACT_TIME |
+ 	                          ARCHIVE_EXTRACT_UNLINK |
+@@ -266,7 +266,7 @@ static int extract_single_file(alpm_handle_t *handle, struct archive *archive,
+ 					"filesystem: %o  package: %o\n", filename, lsbuf.st_mode & mask,
+ 					entrymode & mask);
+ 		}
+-#ifndef __MSYS__
++#if !defined(__MSYS__) && !defined(MSYS2_PACMAN_LINUX)
+ 
+ #if 0
+ 		/* Disable this warning until our user management in packages has improved.
+diff --git a/lib/libalpm/version.c b/lib/libalpm/version.c
+index a58d9de4..3b801fa4 100644
+--- a/lib/libalpm/version.c
++++ b/lib/libalpm/version.c
+@@ -50,7 +50,7 @@ static void parseEVR(char *evr, const char **ep, const char **vp,
+ 	/* se points to version terminator */
+ 	se = strrchr(s, '-');
+ 
+-#ifdef __MSYS__
++#if defined(__MSYS__) || defined(MSYS2_PACMAN_LINUX)
+ 	if(*s == '~') {
+ #else
+ 	if(*s == ':') {
+diff --git a/scripts/libmakepkg/util/pkgbuild.sh.in b/scripts/libmakepkg/util/pkgbuild.sh.in
+index 1fd903b2..3b6c4175 100644
+--- a/scripts/libmakepkg/util/pkgbuild.sh.in
++++ b/scripts/libmakepkg/util/pkgbuild.sh.in
+@@ -166,7 +166,7 @@ get_pkgbuild_all_split_attributes() {
+ ##
+ get_full_version() {
+ 	if (( epoch > 0 )); then
+-		if [[ -n $MSYSTEM ]]; then
++		if [[ -n $MSYSTEM ]] || [[ -n $MSYS2_PACMAN_LINUX ]]; then
+ 			printf "%s\n" "${epoch}~${pkgver}-${pkgrel}"
+ 		else
+ 			printf "%s\n" "$epoch:$pkgver-$pkgrel"
+diff --git a/scripts/libmakepkg/utils_fixed_path.sh.in b/scripts/libmakepkg/utils_fixed_path.sh.in
+index e3a06bc1..7ec6514e 100644
+--- a/scripts/libmakepkg/utils_fixed_path.sh.in
++++ b/scripts/libmakepkg/utils_fixed_path.sh.in
+@@ -1,4 +1,4 @@
+-if [[ -n "$MSYSTEM" ]]; then
++if [[ -n "$MSYSTEM" ]] || [[ -n "$MSYS2_PACMAN_LINUX" ]]; then
+   readonly -a UTILS_NAME=('bsdtar'
+                           'bzip2'
+                           'bzr'
+diff --git a/src/pacman/check.c b/src/pacman/check.c
+index 3d981c59..188550da 100644
+--- a/src/pacman/check.c
++++ b/src/pacman/check.c
+@@ -75,7 +75,7 @@ static int check_file_permissions(const char *pkgname, const char *filepath,
+ 	int errors = 0;
+ 	mode_t fsmode;
+ 
+-#ifndef __MSYS__
++#if !defined(__MSYS__) && !defined(MSYS2_PACMAN_LINUX)
+ 	/* uid */
+ 	if(st->st_uid != archive_entry_uid(entry)) {
+ 		errors++;
+diff --git a/src/pacman/pacman.c b/src/pacman/pacman.c
+index 46c8ef8b..7d8b86ae 100644
+--- a/src/pacman/pacman.c
++++ b/src/pacman/pacman.c
+@@ -1117,7 +1117,7 @@ static void cl_to_log(int argc, char *argv[])
+ int main(int argc, char *argv[])
+ {
+ 	int ret = 0;
+-#ifndef __MSYS__
++#if !defined(__MSYS__) && !defined(MSYS2_PACMAN_LINUX)
+ 	uid_t myuid = getuid();
+ #endif
+ 
+@@ -1163,7 +1163,7 @@ int main(int argc, char *argv[])
+ 		cleanup(ret);
+ 	}
+ 
+-#ifndef __MSYS__
++#if !defined(__MSYS__) && !defined(MSYS2_PACMAN_LINUX)
+ 	/* check if we have sufficient permission for the requested operation */
+ 	if(myuid > 0 && needs_root()) {
+ 		pm_printf(ALPM_LOG_ERROR, _("you cannot perform this operation unless you are root.\n"));
+@@ -1187,7 +1187,7 @@ int main(int argc, char *argv[])
+ 				if(line[nread - 1] == '\n') {
+ 					/* remove trailing newline */
+ 					line[nread - 1] = '\0';
+-#ifdef __MSYS__
++#if defined(__MSYS__) || defined(MSYS2_PACMAN_LINUX)
+ 					if (line[nread - 2] == '\r') {
+ 						/* remove trailing carriage returns */
+ 						line[nread - 2] = '\0';

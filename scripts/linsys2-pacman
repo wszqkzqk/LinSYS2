@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+# LinSYS2 - CLI wrapper for MSYS2 pacman on Linux
+
+import os
+import sys
+import subprocess
+import shutil
+import platform
+from pathlib import Path
+
+# Configuration
+PROJECT_NAME = "LinSYS2"
+CONFIG_DIR = Path.home() / ".config" / "linsys2-pacman"
+DATA_DIR = Path.home() / ".local" / "share" / "linsys2-pacman"
+
+# Derive private prefix from wrapper location.
+# Wrapper is at <prefix>/bin/linsys2-pacman
+# Private prefix is <prefix>/lib/linsys2-pacman
+_PRIVATE_PREFIX = Path(__file__).resolve().parent.parent / "lib" / "linsys2-pacman"
+PACMAN_BIN = _PRIVATE_PREFIX / "bin" / "pacman"
+PACMAN_KEY = _PRIVATE_PREFIX / "bin" / "pacman-key"
+LIBALPM_DIR = _PRIVATE_PREFIX / "lib"
+
+# Supported environments
+ENVIRONMENTS = {
+    "ucrt64": {
+        "prefix": "mingw-w64-ucrt-x86_64",
+        "install_prefix": "/ucrt64",
+        "mirror_path": "ucrt64",
+    },
+    "clang64": {
+        "prefix": "mingw-w64-clang-x86_64",
+        "install_prefix": "/clang64",
+        "mirror_path": "clang64",
+    },
+    "clangarm64": {
+        "prefix": "mingw-w64-clang-aarch64",
+        "install_prefix": "/clangarm64",
+        "mirror_path": "clangarm64",
+    },
+}
+
+# Auto-detect default environment based on host architecture
+_machine = platform.machine().lower()
+if _machine in ("aarch64", "arm64"):
+    DEFAULT_ENV = "clangarm64"
+else:
+    DEFAULT_ENV = "ucrt64"
+
+MSYS2_MIRRORS = [
+    "https://mirror.msys2.org/mingw/$repo",
+    "https://repo.msys2.org/mingw/$repo",
+    "https://mirrors.tuna.tsinghua.edu.cn/msys2/mingw/$repo",
+    "https://mirrors.ustc.edu.cn/msys2/mingw/$repo",
+    "https://mirrors.bfsu.edu.cn/msys2/mingw/$repo",
+    "https://mirrors.aliyun.com/msys2/mingw/$repo",
+]
+
+# LinSYS2-specific subcommands
+LINSYS2_SUBCOMMANDS = {"init", "run", "shell", "update-keyring"}
+
+
+def info(msg):
+    print(f"\033[0;32m[INFO]\033[0m {msg}")
+
+
+def warn(msg):
+    print(f"\033[1;33m[WARN]\033[0m {msg}")
+
+
+def error(msg):
+    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+
+
+def get_pacman_binary():
+    """Find the pacman binary."""
+    if PACMAN_BIN.exists():
+        return str(PACMAN_BIN)
+    error("Pacman binary not found.")
+    error(f"Expected: {PACMAN_BIN}")
+    sys.exit(1)
+
+
+def get_pacman_key_binary():
+    """Find the pacman-key script."""
+    if PACMAN_KEY.exists():
+        return str(PACMAN_KEY)
+    error("pacman-key not found.")
+    error(f"Expected: {PACMAN_KEY}")
+    sys.exit(1)
+
+
+def get_pacman_env():
+    """Prepare environment for running pacman and pacman-key.
+
+    Ensures private prefix binaries (pacman-conf) and libraries (libalpm)
+    are discoverable.
+    """
+    env = os.environ.copy()
+    env["MSYS2_PACMAN_LINUX"] = "1"
+
+    if LIBALPM_DIR.exists():
+        env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + ":" + env.get("LD_LIBRARY_PATH", "")
+
+    bin_dir = _PRIVATE_PREFIX / "bin"
+    if bin_dir.exists():
+        env["PATH"] = str(bin_dir) + ":" + env.get("PATH", "")
+
+    return env
+
+
+def get_env_config(env_name):
+    """Get environment configuration."""
+    if env_name not in ENVIRONMENTS:
+        error(f"Unknown environment: {env_name}")
+        error(f"Supported: {', '.join(ENVIRONMENTS.keys())}")
+        sys.exit(1)
+    return ENVIRONMENTS[env_name]
+
+
+def get_config_file(env_name):
+    """Get path to pacman config file for an environment."""
+    return CONFIG_DIR / f"{env_name}.conf"
+
+
+def get_env_dir(env_name):
+    """Get data directory for an environment."""
+    return DATA_DIR / env_name
+
+
+def create_mirrorlist():
+    """Create mirrorlist file."""
+    mirrorlist_file = CONFIG_DIR / "mirrorlist.mingw"
+    if mirrorlist_file.exists():
+        return
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(mirrorlist_file, "w") as f:
+        f.write("##\n")
+        f.write("## MSYS2 MINGW Repository Mirrorlist\n")
+        f.write("##\n\n")
+        for mirror in MSYS2_MIRRORS:
+            f.write(f"Server = {mirror}\n")
+
+
+def create_config(env_name):
+    """Create pacman configuration file for an environment."""
+    env_cfg = get_env_config(env_name)
+    env_dir = get_env_dir(env_name)
+    config_file = get_config_file(env_name)
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    env_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    (env_dir / "var" / "lib" / "pacman").mkdir(parents=True, exist_ok=True)
+    (env_dir / "var" / "cache" / "pacman" / "pkg").mkdir(parents=True, exist_ok=True)
+    (env_dir / "etc" / "pacman.d" / "hooks").mkdir(parents=True, exist_ok=True)
+    (env_dir / env_cfg["install_prefix"].lstrip("/")).mkdir(parents=True, exist_ok=True)
+
+    create_mirrorlist()
+
+    config_content = f"""#
+# LinSYS2 pacman configuration for {env_name}
+#
+
+[options]
+RootDir      = {env_dir}
+DBPath       = {env_dir}/var/lib/pacman
+CacheDir     = {env_dir}/var/cache/pacman/pkg
+GPGDir       = {env_dir}/etc/pacman.d/gnupg
+HookDir      = {env_dir}/etc/pacman.d/hooks
+LogFile      = {env_dir}/var/log/pacman.log
+Architecture = auto
+Color
+CheckSpace
+ParallelDownloads = 8
+SigLevel     = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[{env_name}]
+Include = {CONFIG_DIR / "mirrorlist.mingw"}
+"""
+
+    with open(config_file, "w") as f:
+        f.write(config_content)
+
+    info(f"Configuration created: {config_file}")
+
+
+def run_pacman(env_name, pacman_args):
+    """Run pacman with the given arguments."""
+    pacman_bin = get_pacman_binary()
+    config_file = get_config_file(env_name)
+    env_dir = get_env_dir(env_name)
+    db_dir = env_dir / "var" / "lib" / "pacman"
+
+    if not config_file.exists() or not db_dir.exists():
+        info(f"Environment {env_name} not initialized, running init...")
+        cmd_init(["--env", env_name])
+
+    cmd = [pacman_bin, "--config", str(config_file)] + pacman_args
+    env = get_pacman_env()
+    return subprocess.run(cmd, env=env)
+
+
+def parse_env_arg(args):
+    """Parse --env/-e from argument list. Returns (env_name, remaining_args)."""
+    env_name = None
+    remaining = []
+    skip_next = False
+
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in ("--env", "-e"):
+            if i + 1 < len(args):
+                env_name = args[i + 1]
+                skip_next = True
+            else:
+                error("Option --env requires an argument")
+                sys.exit(1)
+        else:
+            remaining.append(arg)
+
+    if env_name is None:
+        env_name = DEFAULT_ENV
+
+    return env_name, remaining
+
+
+def show_help():
+    """Show help message."""
+    print(f"""{PROJECT_NAME} - Manage MSYS2 mingw-w64 packages on Linux
+
+Usage:
+  linsys2-pacman [pacman-options...]
+    Run pacman commands directly. Defaults to ucrt64 environment.
+    Examples:
+      linsys2-pacman -Syu               # Upgrade ucrt64 packages
+      linsys2-pacman -S gcc             # Install gcc in ucrt64
+      linsys2-pacman -R gcc             # Remove gcc from ucrt64
+      linsys2-pacman -Q                 # List ucrt64 installed packages
+      linsys2-pacman -Ss search         # Search packages
+
+  linsys2-pacman --env ENV [pacman-options...]
+    Use a non-default environment.
+
+  linsys2-pacman init [--env ENV] [--force]
+    Initialize a new environment.
+
+  linsys2-pacman run [--env ENV] PROGRAM [args...]
+    Run a Windows program through Wine.
+    Example: linsys2-pacman run gcc --version
+
+  linsys2-pacman shell [--env ENV]
+    Start a shell with the environment PATH set.
+
+Environments: {', '.join(ENVIRONMENTS.keys())} (default: {DEFAULT_ENV})
+""")
+
+
+def cmd_init(args):
+    """Initialize a new environment."""
+    # For init, args format is: ["--env", "ucrt64", "--force"]
+    env_name, remaining = parse_env_arg(args)
+    force = "--force" in remaining
+
+    env_cfg = get_env_config(env_name)
+    env_dir = get_env_dir(env_name)
+
+    info(f"Initializing {env_name} environment...")
+
+    if env_dir.exists() and any(env_dir.iterdir()):
+        warn(f"Environment directory already exists: {env_dir}")
+        if not force:
+            try:
+                response = input("Reinitialize? [y/N] ")
+            except EOFError:
+                response = "n"
+            if response.lower() not in ("y", "yes"):
+                info("Aborted")
+                return 0
+
+    create_config(env_name)
+
+    info("Initializing pacman keyring...")
+    pacman_key = get_pacman_key_binary()
+    config_file = get_config_file(env_name)
+    env = get_pacman_env()
+
+    try:
+        subprocess.run([pacman_key, "--config", str(config_file), "--init"],
+                       env=env, check=True, capture_output=True)
+        subprocess.run([pacman_key, "--config", str(config_file), "--populate", "msys2"],
+                       env=env, check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        warn("pacman-key initialization failed. You may need to run 'linsys2-pacman init --force'.")
+
+    info(f"Environment {env_name} initialized successfully")
+    return 0
+
+
+def cmd_run(args):
+    """Run a program through Wine."""
+    # args format: ["--env", "ucrt64", "gcc", "--version"]
+    env_name, remaining = parse_env_arg(args)
+
+    if not remaining:
+        error("Missing program name")
+        return 1
+
+    program = remaining[0]
+    program_args = remaining[1:]
+
+    env_cfg = get_env_config(env_name)
+    env_dir = get_env_dir(env_name)
+
+    bin_dir = env_dir / env_cfg["install_prefix"].lstrip("/") / "bin"
+
+    if "/" not in program:
+        if not bin_dir.exists():
+            error(f"No packages installed for {env_name}")
+            error(f"Run: linsys2-pacman init --env {env_name}")
+            error(f"Then: linsys2-pacman --env {env_name} -S <package>")
+            return 1
+
+        if not program.endswith(".exe"):
+            program = program + ".exe"
+
+        program_path = bin_dir / program
+        if not program_path.exists():
+            error(f"Program not found: {program}")
+            error(f"Searched in: {bin_dir}")
+            return 1
+    else:
+        program_path = Path(program)
+
+    wine_cmd = ["wine", str(program_path)] + program_args
+    return subprocess.run(wine_cmd).returncode
+
+
+def cmd_shell(args):
+    """Start a shell with the environment PATH set."""
+    env_name, _ = parse_env_arg(args)
+    env_cfg = get_env_config(env_name)
+    env_dir = get_env_dir(env_name)
+
+    bin_dir = env_dir / env_cfg["install_prefix"].lstrip("/") / "bin"
+
+    if not bin_dir.exists():
+        warn(f"No packages installed for {env_name}")
+        warn(f"Run: linsys2-pacman init --env {env_name}")
+        warn(f"Then: linsys2-pacman --env {env_name} -S <package>")
+
+    env = os.environ.copy()
+    if bin_dir.exists():
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["MSYS2_PACMAN_LINUX"] = "1"
+
+    shell = os.environ.get("SHELL", "/bin/bash")
+    info(f"Starting shell with {env_name} in PATH...")
+    info(f"Type 'exit' to leave the environment")
+
+    return subprocess.run([shell], env=env).returncode
+
+
+def cmd_update_keyring(args):
+    """Update the pacman keyring from installed keyring files."""
+    env_name, _ = parse_env_arg(args)
+    config_file = get_config_file(env_name)
+
+    if not config_file.exists():
+        error(f"Configuration not found: {config_file}")
+        error(f"Run: linsys2-pacman init --env {env_name}")
+        return 1
+
+    pacman_key = get_pacman_key_binary()
+    env = get_pacman_env()
+
+    info(f"Updating keyring for {env_name}...")
+    try:
+        subprocess.run([pacman_key, "--config", str(config_file), "--populate", "msys2"],
+                       env=env, check=True)
+        info("Keyring updated successfully")
+    except subprocess.CalledProcessError as e:
+        error(f"Keyring update failed: {e}")
+        return 1
+    return 0
+
+
+def passthrough_mode(args):
+    """Pass all arguments (except --env) directly to pacman."""
+    env_name, pacman_args = parse_env_arg(args)
+    result = run_pacman(env_name, pacman_args)
+    return result.returncode
+
+
+def main():
+    args = sys.argv[1:]
+
+    if not args:
+        show_help()
+        return 0
+
+    if args[0] in ("-h", "--help", "help"):
+        show_help()
+        return 0
+
+    if args[0] in ("-V", "--version"):
+        print(f"{PROJECT_NAME} pacman wrapper")
+        return 0
+
+    if args[0] in LINSYS2_SUBCOMMANDS:
+        subcommand = args[0]
+        sub_args = args[1:]
+        if subcommand == "init":
+            return cmd_init(sub_args)
+        elif subcommand == "run":
+            return cmd_run(sub_args)
+        elif subcommand == "shell":
+            return cmd_shell(sub_args)
+        elif subcommand == "update-keyring":
+            return cmd_update_keyring(sub_args)
+
+    return passthrough_mode(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

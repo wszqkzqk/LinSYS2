@@ -1,0 +1,35 @@
+# Build artifacts
+dist/
+build/
+*.tar.zst
+*.pkg.tar.*
+
+# Arch Linux makepkg directories
+/src/
+/pkg/
+
+
+
+# Pacman databases and caches
+*.db
+*.files
+*.sig
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Submodule should remain clean
+# (patches are applied during build, not stored in submodule)
