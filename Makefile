@@ -65,6 +65,7 @@ configure: $(PATCH_STAMP)
 		(echo "[LinSYS2] Configuring meson..." && \
 		 cd $(SUBMODULE) && meson setup build \
 			--prefix=$(PRIVATE_PREFIX) \
+			--libdir=$(PRIVATE_PREFIX)/lib \
 			--sysconfdir=$(PRIVATE_PREFIX)/etc \
 			--localstatedir=$(PRIVATE_PREFIX)/var \
 			--buildtype=release \
