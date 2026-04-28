@@ -4,6 +4,7 @@
 import os
 import sys
 import subprocess
+import argparse
 import platform
 from pathlib import Path
 
@@ -204,37 +205,11 @@ def run_pacman(env_name, pacman_args):
 
     if not config_file.exists() or not db_dir.exists():
         info(f"Environment {env_name} not initialized, running init...")
-        cmd_init(["--env", env_name])
+        cmd_init(argparse.Namespace(env=env_name, force=False))
 
     cmd = [pacman_bin, "--config", str(config_file)] + pacman_args
     env = get_pacman_env()
     return subprocess.run(cmd, env=env)
-
-
-def parse_env_arg(args):
-    """Parse --env/-e from argument list. Returns (env_name, remaining_args)."""
-    env_name = None
-    remaining = []
-    skip_next = False
-
-    for i, arg in enumerate(args):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg == "--env":
-            if i + 1 < len(args):
-                env_name = args[i + 1]
-                skip_next = True
-            else:
-                error("Option --env requires an argument")
-                sys.exit(1)
-        else:
-            remaining.append(arg)
-
-    if env_name is None:
-        env_name = DEFAULT_ENV
-
-    return env_name, remaining
 
 
 def show_help():
@@ -266,9 +241,8 @@ Environments: {', '.join(ENVIRONMENTS.keys())} (default: {DEFAULT_ENV})
 
 def cmd_init(args):
     """Initialize a new environment."""
-    # For init, args format is: ["--env", "ucrt64", "--force"]
-    env_name, remaining = parse_env_arg(args)
-    force = "--force" in remaining
+    env_name = args.env
+    force = args.force
 
     env_cfg = get_env_config(env_name)
     env_dir = get_env_dir(env_name)
@@ -308,7 +282,7 @@ def cmd_init(args):
 
 def cmd_update_keyring(args):
     """Update the pacman keyring from installed keyring files."""
-    env_name, _ = parse_env_arg(args)
+    env_name = args.env
     config_file = get_config_file(env_name)
 
     if not config_file.exists():
@@ -330,37 +304,72 @@ def cmd_update_keyring(args):
     return 0
 
 
-def passthrough_mode(args):
-    """Pass all arguments (except --env) directly to pacman."""
-    env_name, pacman_args = parse_env_arg(args)
+def passthrough_mode(env_name, pacman_args):
+    """Pass all arguments directly to pacman."""
     result = run_pacman(env_name, pacman_args)
     return result.returncode
 
 
 def main():
-    args = sys.argv[1:]
+    argv = sys.argv[1:]
 
-    if not args:
+    if not argv:
         show_help()
         return 0
 
-    if args[0] in ("-h", "--help", "help"):
+    if argv[0] in ("-h", "--help", "help"):
         show_help()
         return 0
 
-    if args[0] in ("-V", "--version"):
+    if argv[0] in ("-V", "--version"):
         print(f"{PROJECT_NAME} pacman wrapper {_get_version()}")
         return 0
 
-    if args[0] in LINSYS2_SUBCOMMANDS:
-        subcommand = args[0]
-        sub_args = args[1:]
-        if subcommand == "init":
-            return cmd_init(sub_args)
-        elif subcommand == "update-keyring":
-            return cmd_update_keyring(sub_args)
+    env_choices = list(ENVIRONMENTS.keys())
 
-    return passthrough_mode(args)
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--env", default=DEFAULT_ENV, choices=env_choices,
+                     help=f"target environment (default: {DEFAULT_ENV})")
+    pre_args, remaining = pre.parse_known_args(argv)
+    env_name = pre_args.env
+
+    if remaining and remaining[0] in LINSYS2_SUBCOMMANDS:
+        subcmd = remaining[0]
+        sub_args = remaining[1:]
+
+        if subcmd == "init":
+            p = argparse.ArgumentParser(add_help=False)
+            p.add_argument("--env", default=env_name, choices=env_choices,
+                           help=f"target environment (default: {env_name})")
+            p.add_argument("--force", action="store_true",
+                           help="reinitialize without prompt")
+            p.add_argument("-h", "--help", action="store_true",
+                           help="show this help message and exit")
+            try:
+                parsed = p.parse_args(sub_args)
+            except SystemExit:
+                return 2
+            if parsed.help:
+                p.print_help()
+                return 0
+            return cmd_init(parsed)
+
+        elif subcmd == "update-keyring":
+            p = argparse.ArgumentParser(add_help=False)
+            p.add_argument("--env", default=env_name, choices=env_choices,
+                           help=f"target environment (default: {env_name})")
+            p.add_argument("-h", "--help", action="store_true",
+                           help="show this help message and exit")
+            try:
+                parsed = p.parse_args(sub_args)
+            except SystemExit:
+                return 2
+            if parsed.help:
+                p.print_help()
+                return 0
+            return cmd_update_keyring(parsed)
+
+    return passthrough_mode(env_name, remaining)
 
 
 if __name__ == "__main__":

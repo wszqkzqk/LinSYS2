@@ -451,37 +451,6 @@ def _get_wineprefix(env_name, prefix_arg=None, prefer_user=False):
     return get_default_wineprefix(env_name)
 
 
-def show_help():
-    print("""linsys2 - Wine integration for LinSYS2 environments
-
-Usage:
-  linsys2 init [--env ENV] [--prefix WINEPREFIX]
-    Initialize Wine prefix for an environment. Defaults to ucrt64.
-
-  linsys2 register [--env ENV] [--prefix WINEPREFIX]
-    Register environment bin directory to Wine PATH.
-
-  linsys2 unregister [--env ENV] [--prefix WINEPREFIX]
-    Remove environment bin directory from Wine PATH.
-
-  linsys2 env [--env ENV] [--prefix WINEPREFIX]
-    Show Wine environment configuration (PATH, WINEPREFIX, etc.).
-
-  linsys2 run [--env ENV] [--prefix WINEPREFIX] [--] PROGRAM [args...]
-    Run a Windows program with the environment integrated.
-    Options must appear before the program name.
-    Use '--' if the program itself takes options starting with '-'.
-    Examples:
-      linsys2 run -- gcc --version
-      linsys2 run --env clang64 -- clang -E file.c
-
-  linsys2 shell [--env ENV] [--prefix WINEPREFIX]
-    Start a shell with Wine environment configured.
-
-Environments: ucrt64, clang64, clangarm64 (default: ucrt64)
-""")
-
-
 def main():
     argv = sys.argv[1:]
 
@@ -489,99 +458,66 @@ def main():
         print(f"linsys2 {_get_version()}")
         return 0
 
+    env_choices = list(ENVIRONMENTS.keys())
+
     parser = argparse.ArgumentParser(
         prog="linsys2",
         description="Wine integration for LinSYS2 mingw-w64 environments",
-        add_help=False
     )
-    parser.add_argument("-h", "--help", action="store_true")
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND",
+                                title="commands")
 
-    args, remaining = parser.parse_known_args()
+    def _add_common(p):
+        p.add_argument("--env", default=DEFAULT_ENV, choices=env_choices,
+                       help=f"target environment (default: {DEFAULT_ENV})")
+        p.add_argument("--prefix", default=None,
+                       help="WINEPREFIX path")
 
-    if args.help or not remaining:
-        show_help()
+    p = sub.add_parser("init", help="Initialize Wine prefix for an environment")
+    _add_common(p)
+    p.set_defaults(func=cmd_init)
+
+    p = sub.add_parser("register", help="Register bin dir to Wine PATH")
+    _add_common(p)
+    p.set_defaults(func=cmd_register)
+
+    p = sub.add_parser("unregister", help="Remove bin dir from Wine PATH")
+    _add_common(p)
+    p.set_defaults(func=cmd_unregister)
+
+    p = sub.add_parser("env", help="Show Wine environment configuration")
+    _add_common(p)
+    p.set_defaults(func=cmd_env)
+
+    p = sub.add_parser(
+        "run",
+        help="Run a Windows program with environment integrated",
+        description="Run a Windows program with the specified environment integrated.\n\n"
+                    "Usage: linsys2 run [OPTIONS] <program> [args...]",
+        epilog="Use -- to separate linsys2 options from program options:\n"
+               "  linsys2 run --env clang64 -- gcc --version",
+    )
+    _add_common(p)
+    p.add_argument("program", help="Program to run")
+    p.add_argument("args", nargs=argparse.REMAINDER, default=[],
+                   help="Arguments to pass to the program")
+    p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("shell",
+                        help="Start a shell with Wine environment configured")
+    _add_common(p)
+    p.set_defaults(func=cmd_shell)
+
+    try:
+        args = parser.parse_args()
+    except SystemExit as e:
+        return e.code
+
+    if args.command is None:
+        parser.print_help()
         return 0
 
-    subcommand = remaining[0]
-    sub_args = remaining[1:]
-
-    # Parse common --env and --prefix options.
-    # Options must appear before the program name.
-    # Use '--' to force all remaining arguments to be treated as program args.
-    env_name = None
-    prefix = None
-    skip_next = False
-    extra_args = []
-    stopped = False
-
-    for i, arg in enumerate(sub_args):
-        if stopped:
-            extra_args.append(arg)
-            continue
-        if skip_next:
-            skip_next = False
-            continue
-        if arg == "--":
-            stopped = True
-            continue
-        if arg in ("--env", "-e"):
-            if i + 1 < len(sub_args):
-                env_name = sub_args[i + 1]
-                skip_next = True
-            else:
-                error("--env requires an argument")
-                return 1
-        elif arg in ("--prefix", "-p"):
-            if i + 1 < len(sub_args):
-                prefix = sub_args[i + 1]
-                skip_next = True
-            else:
-                error("--prefix requires an argument")
-                return 1
-        elif arg.startswith("-"):
-            # Unknown option passed to the program
-            extra_args.append(arg)
-            stopped = True
-        else:
-            # First non-option argument is the program name
-            extra_args.append(arg)
-            stopped = True
-
-    if env_name is None:
-        env_name = DEFAULT_ENV
-
-    if env_name not in ENVIRONMENTS:
-        error(f"Unknown environment: {env_name}")
-        error(f"Supported: {', '.join(ENVIRONMENTS.keys())}")
-        return 1
-
-    class NS:
-        pass
-    cmd_ns = NS()
-    cmd_ns.env = env_name
-    cmd_ns.prefix = prefix
-
-    if subcommand == "init":
-        return cmd_init(cmd_ns)
-    elif subcommand == "register":
-        return cmd_register(cmd_ns)
-    elif subcommand == "unregister":
-        return cmd_unregister(cmd_ns)
-    elif subcommand == "env":
-        return cmd_env(cmd_ns)
-    elif subcommand == "run":
-        if not extra_args:
-            error("run requires a program name")
-            return 1
-        cmd_ns.program = extra_args[0]
-        cmd_ns.args = extra_args[1:]
-        return cmd_run(cmd_ns)
-    elif subcommand == "shell":
-        return cmd_shell(cmd_ns)
-    else:
-        error(f"Unknown subcommand: {subcommand}")
-        show_help()
-        return 1
+    return args.func(args)
 
 
 if __name__ == "__main__":
