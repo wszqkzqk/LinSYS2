@@ -95,8 +95,11 @@ makepkg -si
 
 ### Other distributions
 
-* **Build dependencies:** `meson ninja gcc make git libarchive`
-* **Runtime dependencies:** `curl gnupg libarchive wine`
+The following package list is an example for Ubuntu 24.04. Other distributions
+should install the equivalent packages under their own package names:
+
+* **Build dependencies:** `meson ninja-build gcc make git patch pkg-config libarchive-dev libssl-dev libgpgme-dev libcurl4-openssl-dev`
+* **Runtime dependencies:** `ca-certificates wine`
 
 ```bash
 git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
