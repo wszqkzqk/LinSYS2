@@ -1,0 +1,38 @@
+diff --git a/lib/libalpm/deps.c b/lib/libalpm/deps.c
+index d47d66bb..80a6556b 100644
+--- a/lib/libalpm/deps.c
++++ b/lib/libalpm/deps.c
+@@ -337,6 +337,17 @@ alpm_list_t SYMEXPORT *alpm_checkdeps(alpm_handle_t *handle,
+ 			if(!find_dep_satisfier(upgrade, depend) &&
+ 					!find_dep_satisfier(dblist, depend) &&
+ 					!_alpm_depcmp_provides(depend, handle->assumeinstalled)) {
++#ifdef MSYS2_PACMAN_LINUX
++				if(strncmp(depend->name, "mingw-w64-", 10) != 0) {
++					char *depstring = alpm_dep_compute_string(depend);
++					_alpm_log(handle, ALPM_LOG_WARNING,
++							_("assuming host provides \"%s\", needed by %s\n"),
++							depstring, tp->name);
++					free(depstring);
++					depend->mod = orig_mod;
++					continue;
++				}
++#endif
+ 				/* Unsatisfied dependency in the upgrade list */
+ 				alpm_depmissing_t *miss;
+ 				char *missdepstring = alpm_dep_compute_string(depend);
+@@ -835,6 +846,15 @@ int _alpm_resolvedeps(alpm_handle_t *handle, alpm_list_t *localpkgs,
+ 			alpm_depmissing_free(miss);
+ 		} else if(resolvedep(handle, missdep, (targ = alpm_list_add(NULL, handle->db_local)), rem, 0)) {
+ 			alpm_depmissing_free(miss);
++#ifdef MSYS2_PACMAN_LINUX
++		} else if(strncmp(missdep->name, "mingw-w64-", 10) != 0) {
++			char *missdepstring = alpm_dep_compute_string(missdep);
++			_alpm_log(handle, ALPM_LOG_WARNING,
++					_("assuming host provides \"%s\", needed by %s\n"),
++					missdepstring, pkg->name);
++			free(missdepstring);
++			alpm_depmissing_free(miss);
++#endif
+ 		} else {
+ 			handle->pm_errno = ALPM_ERR_UNSATISFIED_DEPS;
+ 			char *missdepstring = alpm_dep_compute_string(missdep);

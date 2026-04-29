@@ -21,7 +21,8 @@ PREFIX ?= /usr
 DESTDIR ?=
 
 SUBMODULE = vendor/msys2-pacman
-PATCH = patches/0001-LinSYS2-Adapt-MSYS2-pacman-for-Linux.patch
+PATCHES = patches/0001-LinSYS2-Adapt-MSYS2-pacman-for-Linux.patch \
+          patches/0002-LinSYS2-Accept-non-mingw-deps-as-host-provided.patch
 BUILD_DIR = $(SUBMODULE)/build
 PATCH_STAMP = $(SUBMODULE)/.linsys2-patched.stamp
 
@@ -54,10 +55,12 @@ ifdef SUBMODULE_VERSION
 	@cd $(SUBMODULE) && git checkout $(SUBMODULE_VERSION)
 endif
 
-$(PATCH_STAMP): $(PATCH) | checkout
+$(PATCH_STAMP): $(PATCHES) | checkout
 	@echo "[LinSYS2] Applying patches..."
 	@cd $(SUBMODULE) && git checkout -- .
-	@cd $(SUBMODULE) && patch -p1 -i ../../$(PATCH)
+	@for p in $(PATCHES); do \
+		(cd $(SUBMODULE) && patch -p1 -i "../../$$p") || exit 1; \
+	done
 	@touch $@
 
 configure: $(PATCH_STAMP)
@@ -112,7 +115,10 @@ endif
 	@echo "[LinSYS2] Checking out $(SUBMODULE_VERSION)..."
 	@cd $(SUBMODULE) && git checkout $(SUBMODULE_VERSION)
 	@echo "[LinSYS2] Verifying patch compatibility..."
-	@cd $(SUBMODULE) && git checkout -- . && patch -p1 -i ../../$(PATCH) --dry-run --quiet
+	@cd $(SUBMODULE) && git checkout -- .
+	@for p in $(PATCHES); do \
+		(cd $(SUBMODULE) && patch -p1 -i "../../$$p" --dry-run --quiet) || exit 1; \
+	done
 	@echo "[LinSYS2] OK. Staging..."
 	@git add $(SUBMODULE)
 	@echo "Review: git diff --cached"
