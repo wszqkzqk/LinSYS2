@@ -7,8 +7,8 @@ pkgdesc='Build, debug, and run Windows programs on Linux with the full MSYS2 eco
 arch=('x86_64' 'aarch64' 'riscv64' 'loong64')
 url='https://github.com/wszqkzqk/LinSYS2'
 license=('GPL-2.0-or-later')
-depends=('bash' 'curl' 'gettext' 'gnupg' 'libarchive' 'which' 'bzip2' 'xz' 'zstd' 'wine' 'python')
-makedepends=('git' 'meson' 'ninja' 'asciidoc' 'doxygen' 'gcc')
+depends=('bash' 'coreutils' 'curl' 'gawk' 'gettext' 'glibc' 'gnupg' 'gpgme' 'grep' 'libarchive' 'openssl' 'which' 'bzip2' 'xz' 'zstd' 'wine' 'python')
+makedepends=('git' 'meson' 'ninja' 'asciidoc' 'doxygen' 'gcc' 'patch')
 source=("${pkgname}::git+file://${startdir}")
 sha256sums=('SKIP')
 

@@ -95,8 +95,28 @@ makepkg -si
 
 ### Other distributions
 
-* **Build dependencies:** `meson ninja gcc make git libarchive`
-* **Runtime dependencies:** `curl gnupg libarchive wine`
+Other distributions should install the equivalent packages under their own package names.
+
+* **Build dependencies:** `meson ninja-build gcc make git patch pkg-config libarchive libssl libgpgme libcurl`
+* **Runtime dependencies:** `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python`
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt install meson ninja-build gcc make git patch pkg-config \
+    libarchive-dev libssl-dev libgpgme-dev libcurl4-openssl-dev \
+    gawk gettext which gnupg wine python3
+```
+
+On Fedora:
+
+```bash
+sudo dnf install meson ninja-build gcc make git patch pkg-config \
+    libarchive-devel openssl-devel gpgme-devel libcurl-devel \
+    gawk gettext which gnupg wine python3
+```
+
+Build and install:
 
 ```bash
 git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
