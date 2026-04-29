@@ -87,7 +87,7 @@ def get_default_wineprefix(env_name):
 
 def ensure_wine():
     if not shutil.which("wine"):
-        error("Wine not found. Install: pacman -S wine")
+        error("Wine is not installed or not in PATH. Please install Wine and try again.")
         sys.exit(1)
 
 
