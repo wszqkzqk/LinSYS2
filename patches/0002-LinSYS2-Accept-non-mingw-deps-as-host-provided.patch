@@ -36,3 +36,28 @@ index d47d66bb..80a6556b 100644
  		} else {
  			handle->pm_errno = ALPM_ERR_UNSATISFIED_DEPS;
  			char *missdepstring = alpm_dep_compute_string(missdep);
+diff --git a/src/pacman/deptest.c b/src/pacman/deptest.c
+index 455a6a46..ead06883 100644
+--- a/src/pacman/deptest.c
++++ b/src/pacman/deptest.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <string.h>
+ 
+ #include <alpm.h>
+ #include <alpm_list.h>
+@@ -39,6 +40,12 @@ int pacman_deptest(alpm_list_t *targets)
+ 
+ 		if(!alpm_db_get_pkg(localdb, target) &&
+ 				!alpm_find_satisfier(pkgcache, target)) {
++#ifdef MSYS2_PACMAN_LINUX
++			if(strncmp(target, "mingw-w64-", 10) != 0) {
++				fprintf(stderr, "assuming host provides \"%s\"\n", target);
++				continue;
++			}
++#endif
+ 			deps = alpm_list_add(deps, target);
+ 		}
+ 	}
