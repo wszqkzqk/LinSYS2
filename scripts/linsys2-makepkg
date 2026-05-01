@@ -123,11 +123,6 @@ def get_mingw_bin_dir(env_name):
     return get_env_dir(env_name) / env_cfg["install_prefix"].lstrip("/") / "bin"
 
 
-def get_mingw_prefix_dir(env_name):
-    env_cfg = get_env_config(env_name)
-    return get_env_dir(env_name) / env_cfg["install_prefix"].lstrip("/")
-
-
 def get_dispatch_bin_dir(env_name):
     """Get the dispatch bin directory (symlinks / runner)."""
     return get_env_dir(env_name) / "bin"
@@ -168,40 +163,6 @@ def get_tool_env(env_name, include_wine=False):
         env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
 
     return env
-
-
-# Prefix symlink: /ucrt64 -> $DATA_DIR/ucrt64/ucrt64
-# Required because PKGBUILDs use ${MINGW_PREFIX} (= /ucrt64) for paths.
-
-def ensure_prefix_symlink(env_name):
-    env_cfg = get_env_config(env_name)
-    symlink_path = Path(env_cfg["install_prefix"])
-    target_path = get_mingw_prefix_dir(env_name)
-
-    if symlink_path.is_symlink():
-        if Path(os.readlink(str(symlink_path))) == target_path:
-            return True
-        warn(f"{symlink_path} points elsewhere, skipping")
-
-    if symlink_path.exists():
-        warn(f"{symlink_path} exists but is not a symlink")
-        return False
-
-    if not target_path.exists():
-        warn(f"Target dir {target_path} not found; install packages first")
-        return False
-
-    try:
-        symlink_path.symlink_to(target_path)
-        info(f"Prefix symlink: {symlink_path} -> {target_path}")
-        return True
-    except PermissionError:
-        warn(f"No permission to create {symlink_path}")
-        warn(f"Run: sudo ln -s {target_path} {symlink_path}")
-        return False
-    except OSError as e:
-        warn(f"Cannot create {symlink_path}: {e}")
-        return False
 
 
 # Shadow bin — .exe dispatch for Linux
@@ -501,7 +462,6 @@ def cmd_setup(args):
              f"{env_cfg['prefix']}-gcc {env_cfg['prefix']}-binutils "
              f"{env_cfg['prefix']}-pkgconf")
 
-    ensure_prefix_symlink(env_name)
     setup_exe_dispatch(env_name)
     generate_makepkg_config(env_name)
 
@@ -529,7 +489,6 @@ def cmd_build(args):
         info(f"Run: linsys2-pacman init --env {env_name}")
         return 1
 
-    ensure_prefix_symlink(env_name)
     setup_exe_dispatch(env_name)
     conf_path, site_path = generate_makepkg_config(env_name)
 
@@ -594,8 +553,16 @@ def cmd_build(args):
     if env_cfg["rustflags"]:
         env["RUSTFLAGS"] = env_cfg["rustflags"]
 
+    # CPATH / LIBRARY_PATH: let compiler find headers/libs at the actual
+    # mingw prefix path.  PKGBUILDs use -I${MINGW_PREFIX}/include which
+    # resolves to /ucrt64/include (non-existent on Linux).  GCC silently
+    # skips missing -I dirs, then falls back to CPATH/LIBRARY_PATH.
+    mingw_prefix_dir = mingw_bin.parent
+    env["CPATH"] = f"{mingw_prefix_dir}/include"
+    env["LIBRARY_PATH"] = f"{mingw_prefix_dir}/lib"
+
     pkg_config_path = (
-        f"{mingw_bin.parent}/lib/pkgconfig:{mingw_bin.parent}/share/pkgconfig"
+        f"{mingw_prefix_dir}/lib/pkgconfig:{mingw_prefix_dir}/share/pkgconfig"
     )
     if env.get("PKG_CONFIG_PATH"):
         env["PKG_CONFIG_PATH"] = pkg_config_path + ":" + env["PKG_CONFIG_PATH"]
