@@ -319,7 +319,12 @@ def create_pacman_wrapper(env_name):
     wrapper_dir.mkdir(parents=True, exist_ok=True)
     wrapper_path = wrapper_dir / "pacman"
 
-    content = f'#!/bin/sh\nexec "{linsys2_pacman}" --env {env_name} "$@"\n'
+    dispatch_bin = get_dispatch_bin_dir(env_name)
+    content = (
+        '#!/bin/sh\n'
+        f'PATH="${{PATH#{dispatch_bin}:}}"\n'
+        f'exec "{linsys2_pacman}" --env {env_name} "$@"\n'
+    )
     if not wrapper_path.exists() or wrapper_path.read_text() != content:
         wrapper_path.write_text(content)
         wrapper_path.chmod(0o755)
