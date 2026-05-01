@@ -260,7 +260,6 @@ def cmd_init(args):
     env_name = args.env
     force = args.force
 
-    env_cfg = get_env_config(env_name)
     env_dir = get_env_dir(env_name)
 
     info(f"Initializing {env_name} environment...")
