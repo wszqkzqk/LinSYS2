@@ -101,7 +101,8 @@ def winepath_unix_to_windows(unix_path, env=None):
         return result.stdout.strip()
     except subprocess.CalledProcessError:
         p = Path(unix_path).resolve()
-        return f"Z:{str(p).replace('/', '\\')}"
+        win_path = str(p).replace("/", "\\")
+        return f"Z:{win_path}"
 
 
 def wine_registry_get(path, value, env=None):
