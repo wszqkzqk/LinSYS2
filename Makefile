@@ -22,7 +22,8 @@ DESTDIR ?=
 
 SUBMODULE = vendor/msys2-pacman
 PATCHES = patches/0001-LinSYS2-Adapt-MSYS2-pacman-for-Linux.patch \
-          patches/0002-LinSYS2-Accept-non-mingw-deps-as-host-provided.patch
+          patches/0002-LinSYS2-Accept-non-mingw-deps-as-host-provided.patch \
+          patches/0003-LinSYS2-Install-bash-completion-under-prefix.patch
 BUILD_DIR = $(SUBMODULE)/build
 PATCH_STAMP = $(SUBMODULE)/.linsys2-patched.stamp
 
@@ -86,9 +87,7 @@ install:
 	@test -f $(BUILD_DIR)/pacman || \
 		(echo "ERROR: Build artifacts not found. Run 'make build' first." && exit 1)
 	cd $(SUBMODULE) && DESTDIR=$(DESTDIR) ninja -C build install
-	@rm -f $(DESTDIR)/usr/share/bash-completion/completions/pacman
-	@rm -f $(DESTDIR)/usr/share/bash-completion/completions/pacman-key
-	@rm -f $(DESTDIR)/usr/share/bash-completion/completions/makepkg
+	@rm -rf $(DESTDIR)$(PRIVATE_PREFIX)/share/bash-completion
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2.gpg $(KEYRING_DIR)/msys2.gpg
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2-trusted $(KEYRING_DIR)/msys2-trusted
 	install -Dm644 $(KEYRING_SUBMODULE)/msys2-revoked $(KEYRING_DIR)/msys2-revoked
