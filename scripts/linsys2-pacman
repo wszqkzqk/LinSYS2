@@ -120,6 +120,10 @@ def get_pacman_env():
     env = os.environ.copy()
     env["MSYS2_PACMAN_LINUX"] = "1"
 
+    # Override hardcoded build-time paths for relocatable installs.
+    env["MAKEPKG_LIBRARY"] = str(_PRIVATE_PREFIX / "share" / "makepkg")
+    env["KEYRING_IMPORT_DIR"] = str(_PRIVATE_PREFIX / "share" / "pacman" / "keyrings")
+
     if LIBALPM_DIR.exists():
         old = env.get("LD_LIBRARY_PATH")
         env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + (":" + old if old else "")
