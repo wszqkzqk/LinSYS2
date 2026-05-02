@@ -1,0 +1,29 @@
+name: Build Verify
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-verify:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm git
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up build user
+        run: |
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+
+      - name: Build package
+        run: |
+          chown -R builder:builder .
+          su builder -c 'makepkg --syncdeps --noconfirm --clean'
