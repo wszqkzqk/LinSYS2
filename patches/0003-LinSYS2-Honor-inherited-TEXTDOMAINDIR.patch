@@ -1,0 +1,75 @@
+From 8cd731a91b7d7a7d8bbe64b7354f7098032bf4b4 Mon Sep 17 00:00:00 2001
+From: Bin Meng <bmeng.cn@gmail.com>
+Date: Sat, 2 May 2026 13:45:33 +0800
+Subject: [PATCH] LinSYS2: Honor inherited TEXTDOMAINDIR in bash scripts
+
+The pacman bash scripts unconditionally `export TEXTDOMAINDIR='@localedir@'`
+right after start-up, which clobbers any value set by a relocatable
+wrapper before invoking them.  Switch to a conditional assignment so a
+caller can point gettext at a runtime-resolved locale dir; the
+build-time default is preserved when the variable is unset.
+
+Signed-off-by: Bin Meng <bmeng.cn@gmail.com>
+---
+ scripts/makepkg.sh.in           | 3 ++-
+ scripts/pacman-db-upgrade.sh.in | 3 ++-
+ scripts/pacman-key.sh.in        | 3 ++-
+ scripts/repo-add.sh.in          | 3 ++-
+ 4 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/scripts/makepkg.sh.in b/scripts/makepkg.sh.in
+index 1111111..2222222 100644
+--- a/scripts/makepkg.sh.in
++++ b/scripts/makepkg.sh.in
+@@ -31,7 +31,8 @@
+
+ # gettext initialization
+ export TEXTDOMAIN='pacman-scripts'
+-export TEXTDOMAINDIR='@localedir@'
++: "${TEXTDOMAINDIR:=@localedir@}"
++export TEXTDOMAINDIR
+
+ # file -i does not work on Mac OSX unless legacy mode is set
+ export COMMAND_MODE='legacy'
+diff --git a/scripts/pacman-db-upgrade.sh.in b/scripts/pacman-db-upgrade.sh.in
+index 1111111..2222222 100644
+--- a/scripts/pacman-db-upgrade.sh.in
++++ b/scripts/pacman-db-upgrade.sh.in
+@@ -25,7 +25,8 @@
+
+ # gettext initialization
+ export TEXTDOMAIN='pacman-scripts'
+-export TEXTDOMAINDIR='@localedir@'
++: "${TEXTDOMAINDIR:=@localedir@}"
++export TEXTDOMAINDIR
+
+ declare -r myver='@PACKAGE_VERSION@'
+
+diff --git a/scripts/pacman-key.sh.in b/scripts/pacman-key.sh.in
+index 1111111..2222222 100644
+--- a/scripts/pacman-key.sh.in
++++ b/scripts/pacman-key.sh.in
+@@ -21,7 +21,8 @@
+
+ # gettext initialization
+ export TEXTDOMAIN='pacman-scripts'
+-export TEXTDOMAINDIR='@localedir@'
++: "${TEXTDOMAINDIR:=@localedir@}"
++export TEXTDOMAINDIR
+
+ declare -r myver="@PACKAGE_VERSION@"
+
+diff --git a/scripts/repo-add.sh.in b/scripts/repo-add.sh.in
+index 1111111..2222222 100644
+--- a/scripts/repo-add.sh.in
++++ b/scripts/repo-add.sh.in
+@@ -22,7 +22,8 @@
+
+ # gettext initialization
+ export TEXTDOMAIN='pacman-scripts'
+-export TEXTDOMAINDIR='@localedir@'
++: "${TEXTDOMAINDIR:=@localedir@}"
++export TEXTDOMAINDIR
+
+ declare -r myver='@PACKAGE_VERSION@'
+ declare -r confdir='@sysconfdir@'

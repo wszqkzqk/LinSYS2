@@ -115,7 +115,9 @@ def get_pacman_env():
     """Prepare environment for running pacman and pacman-key.
 
     Ensures private prefix binaries (pacman-conf) and libraries (libalpm)
-    are discoverable.
+    are discoverable, and overrides build-time hardcoded paths inside
+    the bundled bash scripts (pacman-key, makepkg, repo-add, ...) so the
+    install tree is fully relocatable.
     """
     env = os.environ.copy()
     env["MSYS2_PACMAN_LINUX"] = "1"
@@ -128,6 +130,14 @@ def get_pacman_env():
     if bin_dir.exists():
         old = env.get("PATH")
         env["PATH"] = str(bin_dir) + (":" + old if old else "")
+
+    # Override build-time hardcoded prefixes baked into bash scripts.
+    # These all honour env-var overrides (see pacman-key, makepkg, etc.).
+    env["MAKEPKG_LIBRARY"] = str(_PRIVATE_PREFIX / "share" / "makepkg")
+    env["TEXTDOMAINDIR"] = str(_PRIVATE_PREFIX / "share" / "locale")
+    env["KEYRING_IMPORT_DIR"] = str(
+        _PRIVATE_PREFIX / "share" / "pacman" / "keyrings"
+    )
 
     return env
 
