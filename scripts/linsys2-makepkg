@@ -1,0 +1,712 @@
+#!/usr/bin/env python3
+#
+# LinSYS2 - Build MSYS2 mingw-w64 packages in LinSYS2
+#
+# Copyright (C) 2026 Zhou Qiankang <wszqkzqk@qq.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import os
+import sys
+import subprocess
+import shutil
+import argparse
+import platform
+from pathlib import Path
+
+# Configuration
+PROJECT_NAME = "LinSYS2"
+CONFIG_DIR = Path.home() / ".config" / "linsys2"
+DATA_DIR = Path.home() / ".local" / "share" / "linsys2"
+
+_PRIVATE_PREFIX = Path(__file__).resolve().parent.parent / "lib" / "linsys2-pacman"
+MAKEPKG_BIN = _PRIVATE_PREFIX / "bin" / "makepkg"
+LIBALPM_DIR = _PRIVATE_PREFIX / "lib"
+
+ENVIRONMENTS = {
+    "ucrt64": {
+        "prefix": "mingw-w64-ucrt-x86_64",
+        "install_prefix": "/ucrt64",
+        "arch": "x86_64",
+        "chost": "x86_64-w64-mingw32",
+        "cc": "gcc",
+        "cxx": "g++",
+        "cflags": "-march=nocona -msahf -mtune=generic -O2 -pipe "
+                  "-Wp,-D_FORTIFY_SOURCE=2 -fstack-protector-strong "
+                  "-Wp,-D__USE_MINGW_ANSI_STDIO=1",
+        "ldflags": "",
+        "rust_chost": "x86_64-pc-windows-gnu",
+        "rustflags": "-Cforce-frame-pointers=yes",
+    },
+    "clang64": {
+        "prefix": "mingw-w64-clang-x86_64",
+        "install_prefix": "/clang64",
+        "arch": "x86_64",
+        "chost": "x86_64-w64-mingw32",
+        "cc": "clang",
+        "cxx": "clang++",
+        "cflags": "-march=nocona -msahf -mtune=generic -O2 -pipe "
+                  "-Wp,-D_FORTIFY_SOURCE=2 -fstack-protector-strong "
+                  "-Wp,-D__USE_MINGW_ANSI_STDIO=1",
+        "ldflags": "",
+        "rust_chost": "x86_64-pc-windows-gnullvm",
+        "rustflags": "-Cforce-frame-pointers=yes -Ctarget-feature=+crt-static",
+    },
+    "clangarm64": {
+        "prefix": "mingw-w64-clang-aarch64",
+        "install_prefix": "/clangarm64",
+        "arch": "aarch64",
+        "chost": "aarch64-w64-mingw32",
+        "cc": "clang",
+        "cxx": "clang++",
+        "cflags": "-march=armv8.1-a -O2 -pipe "
+                  "-Wp,-D_FORTIFY_SOURCE=2 -fstack-protector-strong "
+                  "-Wp,-D__USE_MINGW_ANSI_STDIO=1",
+        "ldflags": "",
+        "rust_chost": "aarch64-pc-windows-gnullvm",
+        "rustflags": "-Cforce-frame-pointers=yes -Ctarget-feature=+crt-static",
+    },
+}
+
+_machine = platform.machine().lower()
+DEFAULT_ENV = "clangarm64" if _machine in ("aarch64", "arm64") else "ucrt64"
+
+
+def _get_version():
+    v = "@VERSION@"
+    return v if not v.startswith("@") else "development"
+
+
+def info(msg):
+    print(f"\033[0;32m[INFO]\033[0m {msg}")
+
+
+def warn(msg):
+    print(f"\033[1;33m[WARN]\033[0m {msg}")
+
+
+def error(msg):
+    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+
+
+def ensure_wine():
+    if not shutil.which("wine"):
+        error("Wine not found. Install: pacman -S wine")
+        sys.exit(1)
+
+
+def get_env_config(env_name):
+    if env_name not in ENVIRONMENTS:
+        error(f"Unknown environment: {env_name}")
+        error(f"Supported: {', '.join(ENVIRONMENTS.keys())}")
+        sys.exit(1)
+    return ENVIRONMENTS[env_name]
+
+
+def get_env_dir(env_name):
+    return DATA_DIR / env_name
+
+
+def get_mingw_bin_dir(env_name):
+    env_cfg = get_env_config(env_name)
+    return get_env_dir(env_name) / env_cfg["install_prefix"].lstrip("/") / "bin"
+
+
+def get_dispatch_bin_dir(env_name):
+    """Get the dispatch bin directory (symlinks / runner)."""
+    return get_env_dir(env_name) / "bin"
+
+
+def get_pacman_config_file(env_name):
+    return CONFIG_DIR / f"{env_name}.conf"
+
+
+def get_wineprefix(env_name):
+    config_file = get_env_dir(env_name) / "wine.config"
+    if config_file.exists():
+        with open(config_file) as f:
+            for line in f:
+                if line.startswith("WINEPREFIX="):
+                    parts = line.strip().split("=", 1)
+                    if len(parts) == 2 and parts[1]:
+                        return Path(parts[1])
+    return get_env_dir(env_name) / "wine"
+
+
+def get_tool_env(env_name, include_wine=False):
+    env = os.environ.copy()
+    env["MSYS2_PACMAN_LINUX"] = "1"
+
+    if LIBALPM_DIR.exists():
+        old = env.get("LD_LIBRARY_PATH")
+        env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + (":" + old if old else "")
+
+    bin_dir = _PRIVATE_PREFIX / "bin"
+    if bin_dir.exists():
+        old = env.get("PATH")
+        env["PATH"] = str(bin_dir) + (":" + old if old else "")
+
+    if include_wine:
+        ensure_wine()
+        env["WINEPREFIX"] = str(get_wineprefix(env_name))
+        env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+
+    return env
+
+
+# Shadow bin — .exe dispatch for Linux
+#
+# Linux cannot execute PE (.exe) directly.  Two modes:
+#
+# binfmt_misc registered (Arch, Debian, Fedora default):
+#   Create symlinks gcc -> gcc.exe directly in the mingw bin.
+#   Kernel detects MZ magic and invokes Wine transparently.
+#   Both ./gcc and ./gcc.exe work.  No extra process.
+#
+# No binfmt_misc (fallback):
+#   Create a runner script + symlinks in a shadow directory.
+#   Runner reads argv[0], finds .exe, execs wine.
+#   Only PATH-based invocation works; ./gcc.exe bypasses runner.
+
+_RUNNER_SCRIPT = r"""#!/bin/sh
+tool="${0##*/}"
+exe="${LINSYS2_MINGW_BIN_DIRS}/${tool}.exe"
+if [ -x "$exe" ]; then
+    exec wine "$exe" "$@"
+fi
+echo "linsys2: tool not found: ${tool}" >&2
+exit 127
+"""
+
+
+def binfmt_wine_registered():
+    """Check if Wine is registered as a binfmt_misc handler for PE files."""
+    binfmt = Path("/proc/sys/fs/binfmt_misc")
+    if not binfmt.exists():
+        return False
+    try:
+        for entry in binfmt.iterdir():
+            if entry.name in (".", "..", "status", "register"):
+                continue
+            try:
+                content = entry.read_text()
+                if any(l.startswith("interpreter ") and "wine" in l.lower()
+                       for l in content.splitlines()):
+                    return True
+            except (PermissionError, OSError):
+                continue
+    except OSError:
+        return False
+    return False
+
+
+def setup_exe_dispatch(env_name):
+    """Set up .exe dispatch — mode depends on binfmt_misc availability."""
+    mingw_bin = get_mingw_bin_dir(env_name)
+    if not mingw_bin.exists():
+        warn(f"Mingw bin dir not found: {mingw_bin}")
+        return False
+
+    if binfmt_wine_registered():
+        return _setup_binfmt_links(mingw_bin)
+    else:
+        return _setup_runner_links(env_name, mingw_bin)
+
+
+def _setup_binfmt_links(mingw_bin):
+    """binfmt mode: symlinks gcc -> ../ucrt64/bin/gcc.exe in dispatch bin."""
+    dispatch_bin = mingw_bin.parent.parent / "bin"
+    dispatch_bin.mkdir(parents=True, exist_ok=True)
+    for exe in mingw_bin.glob("*.exe"):
+        link = dispatch_bin / exe.stem
+        if not link.exists() and not link.is_symlink():
+            link.symlink_to(os.path.relpath(exe, dispatch_bin))
+    for link in dispatch_bin.iterdir():
+        if link.is_symlink() and not link.exists():
+            link.unlink()
+    return True
+
+
+def _setup_runner_links(env_name, mingw_bin):
+    """Fallback mode: runner script + symlinks in dispatch bin."""
+    dispatch_bin = get_dispatch_bin_dir(env_name)
+    dispatch_bin.mkdir(parents=True, exist_ok=True)
+
+    runner = dispatch_bin / "_linsys2-runner"
+    if not runner.exists() or runner.read_text() != _RUNNER_SCRIPT:
+        runner.write_text(_RUNNER_SCRIPT)
+        runner.chmod(0o755)
+
+    exe_stems = {p.stem for p in mingw_bin.glob("*.exe")}
+    existing = {p.name for p in dispatch_bin.iterdir()
+                if p.is_symlink() and p.name != "_linsys2-runner"}
+    stale = existing - exe_stems
+    fresh = exe_stems - existing
+
+    for name in stale:
+        (dispatch_bin / name).unlink()
+    for name in fresh:
+        (dispatch_bin / name).symlink_to("_linsys2-runner")
+
+    if fresh or stale:
+        info(f"Dispatch bin (runner): +{len(fresh)} -{len(stale)} in {dispatch_bin}")
+    return True
+
+
+def create_pacman_wrapper(env_name):
+    """Create a pacman wrapper that calls linsys2-pacman with the right env.
+
+    Makepkg's internal pacman calls (pacman -T, -S --asdeps, -U, -Rnu)
+    are redirected through this wrapper so the environment-specific config
+    is used.
+    """
+    linsys2_pacman = shutil.which("linsys2-pacman")
+    if not linsys2_pacman:
+        warn("linsys2-pacman not in PATH; makepkg dep resolution may fail")
+        return None
+
+    wrapper_dir = get_env_dir(env_name) / ".linsys2-makepkg"
+    wrapper_dir.mkdir(parents=True, exist_ok=True)
+    wrapper_path = wrapper_dir / "pacman"
+
+    dispatch_bin = get_dispatch_bin_dir(env_name)
+    content = (
+        '#!/bin/sh\n'
+        f'PATH="${{PATH#{dispatch_bin}:}}"\n'
+        f'exec "{linsys2_pacman}" --env {env_name} "$@"\n'
+    )
+    if not wrapper_path.exists() or wrapper_path.read_text() != content:
+        wrapper_path.write_text(content)
+        wrapper_path.chmod(0o755)
+    return wrapper_path
+
+
+def generate_makepkg_config(env_name):
+    """Generate makepkg.conf, per-arch config, and autoconf config.site."""
+    env_cfg = get_env_config(env_name)
+    env_dir = get_env_dir(env_name)
+    chost = env_cfg["chost"]
+
+    config_dir = env_dir / "etc" / "linsys2_makepkg.d"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # config.site — forces autotools into cross-compilation mode.
+    # Sourced by configure after arg parsing, before AC_CANONICAL_HOST.
+    # Setting host_alias is equivalent to --host; no PKGBUILD change needed.
+    site_content = (
+        "host_alias=\"{chost}\"\n"
+        "ac_cv_func_malloc_0_nonnull=yes\n"
+        "ac_cv_func_realloc_0_nonnull=yes\n"
+    ).format(chost=chost)
+    site_path = config_dir / f"{env_name}.site"
+    with open(site_path, "w") as f:
+        f.write(site_content)
+
+    # Per-arch config (compiler, flags, paths)
+    arch_config = (
+        f'CARCH="{env_cfg["arch"]}"\n'
+        f'CHOST="{chost}"\n'
+        f'MINGW_CHOST="{chost}"\n'
+        f'MINGW_PREFIX="{env_cfg["install_prefix"]}"\n'
+        f'MINGW_PACKAGE_PREFIX="{env_cfg["prefix"]}"\n'
+        f'CC="{env_cfg["cc"]}"\n'
+        f'CXX="{env_cfg["cxx"]}"\n'
+        "CPPFLAGS=\n"
+        f'CFLAGS="{env_cfg["cflags"]}"\n'
+        "CXXFLAGS=\"$CFLAGS\"\n"
+        f'LDFLAGS="{env_cfg["ldflags"]}"\n'
+        f'RUSTFLAGS="{env_cfg["rustflags"]}"\n'
+        f'RUST_CHOST="{env_cfg["rust_chost"]}"\n'
+    )
+    arch_conf_path = config_dir / f"{env_name}.conf"
+    with open(arch_conf_path, "w") as f:
+        f.write(arch_config)
+
+    # Main makepkg config
+    main_config = (
+        f'if [ -e "{arch_conf_path}" ]; then\n'
+        f'  source "{arch_conf_path}"\n'
+        "else\n"
+        f'  echo "Unsupported environment: {env_name}"\n'
+        "  exit 1\n"
+        "fi\n"
+        "\n"
+        'MAKEFLAGS="-j$(($(nproc)+1))"\n'
+        'DEBUG_CFLAGS="-ggdb -Og"\n'
+        'DEBUG_CXXFLAGS="-ggdb -Og"\n'
+        'ACLOCAL_PATH="${MINGW_PREFIX}/share/aclocal:${MINGW_PREFIX}/../share/aclocal:/usr/share/aclocal"\n'
+        'PKG_CONFIG_PATH="${MINGW_PREFIX}/lib/pkgconfig:${MINGW_PREFIX}/share/pkgconfig"\n'
+        "\n"
+        "BUILDENV=(!distcc color !ccache !check !sign)\n"
+        "OPTIONS=(strip docs !libtool staticlibs emptydirs zipman purge !debug !lto !autodeps)\n"
+        "\n"
+        "INTEGRITY_CHECK=(sha256)\n"
+        'STRIP_BINARIES="--strip-all"\n'
+        'STRIP_SHARED="--strip-unneeded"\n'
+        'STRIP_STATIC="--strip-debug"\n'
+        "\n"
+        'MAN_DIRS=(${MINGW_PREFIX#/}{{,/local}{,/share}{{man,info}})\n'
+        'DOC_DIRS=(${MINGW_PREFIX#/}{{,/local}{,/share}{{doc,gtk-doc}})\n'
+        'PURGE_TARGETS=(${MINGW_PREFIX#/}{{,/share}info/dir .packlist *.pod)\n'
+        'DBGSRCDIR="${MINGW_PREFIX}/src/debug"\n'
+        'LIB_DIRS=(lib:${MINGW_PREFIX#/}/lib lib32:${MINGW_PREFIX#/}/lib32)\n'
+        "\n"
+        "PKGEXT='.pkg.tar.zst'\n"
+        "SRCEXT='.src.tar.zst'\n"
+        "PACMAN_AUTH=()\n"
+        "COMPRESSZST=(zstd -c -19 -T0 -)\n"
+    )
+    main_conf_path = env_dir / "etc" / "linsys2_makepkg.conf"
+    with open(main_conf_path, "w") as f:
+        f.write(main_config)
+
+    return main_conf_path, site_path
+
+
+def parse_pkgbuild(pkgbuild_path, env_name):
+    """Parse PKGBUILD dependency arrays via bash sourcing."""
+    env_cfg = get_env_config(env_name)
+
+    parser_script = (
+        "#!/bin/bash\n"
+        "set -e\n"
+        f'MINGW_PACKAGE_PREFIX="{env_cfg["prefix"]}"\n'
+        f'MINGW_PREFIX="{env_cfg["install_prefix"]}"\n'
+        f'MINGW_CHOST="{env_cfg["chost"]}"\n'
+        f'CARCH="{env_cfg["arch"]}"\n'
+        f'CHOST="{env_cfg["chost"]}"\n'
+        f'MSYSTEM="{env_name.upper()}"\n'
+        "export MINGW_PACKAGE_PREFIX MINGW_PREFIX MINGW_CHOST CARCH CHOST MSYSTEM\n"
+        f'source "{pkgbuild_path}" 2>/dev/null || true\n'
+        'for dep in "${makedepends[@]}"; do echo "MAKEDEP $dep"; done\n'
+        'for dep in "${depends[@]}"; do echo "DEP $dep"; done\n'
+        'for dep in "${checkdepends[@]}"; do echo "CHECKDEP $dep"; done\n'
+        'echo "ARCH ${arch[*]}"\n'
+        'echo "MINGW_ARCH ${mingw_arch[*]}"\n'
+    )
+    try:
+        result = subprocess.run(
+            ["bash", "-c", parser_script],
+            capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        error(f"Timeout parsing PKGBUILD: {pkgbuild_path}")
+        return [], [], [], "", ""
+    except FileNotFoundError:
+        error("bash not found")
+        return [], [], [], "", ""
+
+    if result.returncode != 0 and result.stderr.strip():
+        warn(f"PKGBUILD parse warnings:\n{result.stderr.strip()}")
+
+    makedepends = []
+    depends = []
+    checkdepends = []
+    pkg_arch = ""
+    mingw_arch = ""
+
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("MAKEDEP "):
+            makedepends.append(line[8:])
+        elif line.startswith("DEP "):
+            depends.append(line[4:])
+        elif line.startswith("CHECKDEP "):
+            checkdepends.append(line[9:])
+        elif line.startswith("ARCH "):
+            pkg_arch = line[5:]
+        elif line.startswith("MINGW_ARCH "):
+            mingw_arch = line[11:]
+
+    return ([d for d in makedepends if d.strip()],
+            [d for d in depends if d.strip()],
+            [d for d in checkdepends if d.strip()],
+            pkg_arch, mingw_arch)
+
+
+def check_system_deps(deps):
+    available, missing = [], []
+    for dep in deps:
+        (available if shutil.which(dep) else missing).append(dep)
+    return available, missing
+
+
+def cmd_setup(args):
+    env_name = args.env
+    env_cfg = get_env_config(env_name)
+    mingw_bin = get_mingw_bin_dir(env_name)
+
+    info(f"Setting up build environment for {env_name}...")
+
+    if not get_pacman_config_file(env_name).exists():
+        error(f"Environment {env_name} not initialized")
+        error(f"Run: linsys2-pacman init --env {env_name}")
+        return 1
+
+    if not mingw_bin.exists() or not list(mingw_bin.glob("*.exe")):
+        warn(f"No packages installed.  Install a toolchain first:")
+        warn(f"  linsys2-pacman --env {env_name} -S "
+             f"{env_cfg['prefix']}-gcc {env_cfg['prefix']}-binutils "
+             f"{env_cfg['prefix']}-pkgconf")
+
+    setup_exe_dispatch(env_name)
+    generate_makepkg_config(env_name)
+
+    wineprefix = get_wineprefix(env_name)
+    if not wineprefix.exists():
+        warn(f"Wine prefix not initialised: {wineprefix}")
+        info(f"Run: linsys2 init --env {env_name}")
+
+    info(f"Build environment ready for {env_name}")
+    return 0
+
+
+def cmd_build(args):
+    env_name = args.env
+    env_cfg = get_env_config(env_name)
+    mingw_bin = get_mingw_bin_dir(env_name)
+
+    pkgbuild_path = Path.cwd() / "PKGBUILD"
+    if not pkgbuild_path.exists():
+        error("No PKGBUILD found in current directory")
+        return 1
+
+    if not get_pacman_config_file(env_name).exists():
+        error(f"Environment {env_name} not initialized")
+        info(f"Run: linsys2-pacman init --env {env_name}")
+        return 1
+
+    setup_exe_dispatch(env_name)
+    conf_path, site_path = generate_makepkg_config(env_name)
+
+    # Informational: warn about non-mingw deps (libalpm skips them via 0002 patch)
+    info(f"Parsing {pkgbuild_path}...")
+    makedepends, depends, checkdepends, _parch, _march = \
+        parse_pkgbuild(pkgbuild_path, env_name)
+
+    non_mingw = [d for d in makedepends + depends + checkdepends
+                 if not d.startswith("mingw-w64-")]
+    if non_mingw:
+        available, missing = check_system_deps(non_mingw)
+        if missing:
+            info(f"Host-provided deps (pacman will skip): {', '.join(missing)}")
+            info("Install with your system package manager if build fails.")
+        if available:
+            info(f"Host-provided deps found: {', '.join(available)}")
+
+    pkgbase = pkgbuild_path.parent.name
+    info(f"Building {pkgbase} for {env_name} ({env_cfg['prefix']})")
+
+    env = get_tool_env(env_name, include_wine=True)
+
+    pacman_wrapper = create_pacman_wrapper(env_name)
+    if pacman_wrapper:
+        env["PACMAN"] = str(pacman_wrapper)
+
+    # CONFIG_SITE: force autotools cross-compilation (--host via site file)
+    if site_path.exists():
+        env["CONFIG_SITE"] = str(site_path)
+
+    # PATH: dispatch bin first (handles .exe resolution), then private-bin, then system
+    dispatch_bin = get_dispatch_bin_dir(env_name)
+    if dispatch_bin.exists():
+        old = env.get("PATH", "")
+        env["PATH"] = str(dispatch_bin) + (":" + old if old else "")
+    else:
+        warn("Dispatch bin not found; run 'linsys2-makepkg setup' first")
+
+    try:
+        result = subprocess.run(
+            ["winepath", "-w", str(mingw_bin)],
+            capture_output=True, text=True, env=env
+        )
+        if result.returncode == 0:
+            env["WINEPATH"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    env["LINSYS2_MINGW_BIN_DIRS"] = str(mingw_bin)
+    env["MINGW_PACKAGE_PREFIX"] = env_cfg["prefix"]
+    env["MINGW_PREFIX"] = env_cfg["install_prefix"]
+    env["MINGW_CHOST"] = env_cfg["chost"]
+    env["CARCH"] = env_cfg["arch"]
+    env["CHOST"] = env_cfg["chost"]
+    env["MSYSTEM"] = env_name.upper()
+    env["CC"] = env_cfg["cc"]
+    env["CXX"] = env_cfg["cxx"]
+    env["CFLAGS"] = env_cfg["cflags"]
+    env["CXXFLAGS"] = env_cfg["cflags"]
+    env["LDFLAGS"] = env_cfg["ldflags"]
+    if env_cfg["rustflags"]:
+        env["RUSTFLAGS"] = env_cfg["rustflags"]
+
+    # CPATH / LIBRARY_PATH: let compiler find headers/libs at the actual
+    # mingw prefix path.  PKGBUILDs use -I${MINGW_PREFIX}/include which
+    # resolves to /ucrt64/include (non-existent on Linux).  GCC silently
+    # skips missing -I dirs, then falls back to CPATH/LIBRARY_PATH.
+    mingw_prefix_dir = mingw_bin.parent
+    env["CPATH"] = f"{mingw_prefix_dir}/include"
+    env["LIBRARY_PATH"] = f"{mingw_prefix_dir}/lib"
+
+    pkg_config_path = (
+        f"{mingw_prefix_dir}/lib/pkgconfig:{mingw_prefix_dir}/share/pkgconfig"
+    )
+    if env.get("PKG_CONFIG_PATH"):
+        env["PKG_CONFIG_PATH"] = pkg_config_path + ":" + env["PKG_CONFIG_PATH"]
+    else:
+        env["PKG_CONFIG_PATH"] = pkg_config_path
+
+    if not MAKEPKG_BIN.exists():
+        error(f"makepkg not found: {MAKEPKG_BIN}")
+        return 1
+
+    makepkg_args = [str(MAKEPKG_BIN), "--config", str(conf_path)]
+    if args.syncdeps:
+        makepkg_args.append("-s")
+    if args.nodeps:
+        makepkg_args.append("--nodeps")
+    if args.nocheck:
+        makepkg_args.append("--nocheck")
+    if args.noconfirm:
+        makepkg_args.append("--noconfirm")
+    if args.noprogressbar:
+        makepkg_args.append("--noprogressbar")
+    if args.cleanbuild:
+        makepkg_args.append("--cleanbuild")
+    if args.clean:
+        makepkg_args.append("--clean")
+    if args.rmdeps:
+        makepkg_args.append("--rmdeps")
+    if args.install:
+        makepkg_args.append("--install")
+    if args.force:
+        makepkg_args.append("--force")
+    if args.sign:
+        makepkg_args.append("--sign")
+    makepkg_args.extend(args.makepkg_args)
+
+    info(f"Running: {' '.join(makepkg_args)}")
+    return subprocess.run(makepkg_args, env=env).returncode
+
+
+def main():
+    argv = sys.argv[1:]
+
+    if argv and argv[0] in ("-v", "--version"):
+        print(f"linsys2-makepkg {_get_version()}")
+        return 0
+
+    env_choices = list(ENVIRONMENTS.keys())
+
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--env", default=DEFAULT_ENV, choices=env_choices,
+                     help=f"target environment (default: {DEFAULT_ENV})")
+    pre_args, remaining = pre.parse_known_args(argv)
+
+    if remaining and remaining[0] in ("-h", "--help", "help"):
+        _print_help(env_choices)
+        return 0
+    if remaining and remaining[0] in ("-V", "--version"):
+        print(f"linsys2-makepkg {_get_version()}")
+        return 0
+
+    if remaining and remaining[0] in ("setup", "build"):
+        subcmd, sub_args = remaining[0], remaining[1:]
+    else:
+        subcmd, sub_args = "build", remaining
+
+    if subcmd == "setup":
+        p = argparse.ArgumentParser(add_help=False)
+        p.add_argument("--env", default=pre_args.env, choices=env_choices)
+        p.add_argument("-h", "--help", action="store_true")
+        try:
+            parsed = p.parse_args(sub_args)
+        except SystemExit:
+            return 2
+        if parsed.help:
+            p.print_help()
+            return 0
+        return cmd_setup(parsed)
+
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument("--env", default=pre_args.env, choices=env_choices)
+    p.add_argument("-s", "--syncdeps", action="store_true")
+    p.add_argument("-d", "--nodeps", action="store_true")
+    p.add_argument("--nocheck", action="store_true")
+    p.add_argument("--noconfirm", action="store_true")
+    p.add_argument("--noprogressbar", action="store_true")
+    p.add_argument("-c", "--clean", action="store_true")
+    p.add_argument("-C", "--cleanbuild", action="store_true")
+    p.add_argument("-r", "--rmdeps", action="store_true")
+    p.add_argument("-i", "--install", action="store_true")
+    p.add_argument("-f", "--force", action="store_true")
+    p.add_argument("--sign", action="store_true")
+    p.add_argument("-h", "--help", action="store_true")
+    try:
+        parsed, remainder = p.parse_known_args(sub_args)
+    except SystemExit:
+        return 2
+    if parsed.help:
+        p.print_help()
+        return 0
+    parsed.makepkg_args = remainder
+    parsed.command = "build"
+
+    if not Path.cwd().joinpath("PKGBUILD").exists():
+        error("No PKGBUILD found in current directory")
+        _print_help(env_choices)
+        return 1
+
+    return cmd_build(parsed)
+
+
+def _print_help(env_choices):
+    print(f"""{PROJECT_NAME} - Build MSYS2 mingw-w64 packages in LinSYS2
+
+Usage:
+  linsys2-makepkg setup --env ENV     Prepare build environment
+  linsys2-makepkg [--env ENV] [OPTIONS] [-- makepkg-args...]
+
+Build Options:
+  --env ENV                 Target environment (default: {DEFAULT_ENV})
+  -s, --syncdeps            Install missing mingw-w64 build dependencies
+  -d, --nodeps              Skip dependency checks
+  --nocheck                 Skip check() function
+  --noconfirm               Do not ask for confirmation
+  -c, --clean               Clean work files after build
+  -C, --cleanbuild          Clean build directory before build
+  -r, --rmdeps              Remove installed deps after build
+  -i, --install             Install package after build
+  -f, --force               Overwrite existing packages
+
+Environments: {', '.join(env_choices)} (default: {DEFAULT_ENV})
+
+Host-Provided Dependencies:
+  Non-mingw-w64-* build tools (git, rsync, cmake, etc.) are provided by
+  the Linux host.  libalpm skips them during dep resolution, printing a
+  warning.  Install them with your system package manager if build fails.
+
+Quick Start:
+  linsys2-pacman init --env ucrt64
+  linsys2-pacman --env ucrt64 -S mingw-w64-ucrt-x86_64-gcc
+  linsys2 init --env ucrt64
+  linsys2-makepkg setup --env ucrt64
+  cd MINGW-packages/mingw-w64-zlib && linsys2-makepkg -s
+""")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
