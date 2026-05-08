@@ -23,7 +23,8 @@ DESTDIR ?=
 SUBMODULE = vendor/msys2-pacman
 PATCHES = patches/0001-LinSYS2-Adapt-MSYS2-pacman-for-Linux.patch \
           patches/0002-LinSYS2-Accept-non-mingw-deps-as-host-provided.patch \
-          patches/0003-LinSYS2-Install-bash-completion-under-prefix.patch
+          patches/0003-LinSYS2-Install-bash-completion-under-prefix.patch \
+          patches/0004-LinSYS2-Skip-chroot-scriptlet-execution.patch
 BUILD_DIR = $(SUBMODULE)/build
 PATCH_STAMP = $(SUBMODULE)/.linsys2-patched.stamp
 

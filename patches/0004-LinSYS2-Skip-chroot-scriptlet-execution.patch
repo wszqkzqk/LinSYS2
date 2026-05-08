@@ -1,0 +1,16 @@
+diff --git a/lib/libalpm/util.c b/lib/libalpm/util.c
+index f09077ce..9f4ec314 100644
+--- a/lib/libalpm/util.c
++++ b/lib/libalpm/util.c
+@@ -614,6 +614,11 @@ int _alpm_run_chroot(alpm_handle_t *handle, const char *cmd, char *const argv[],
+ 	int cwdfd;
+ 	int retval = 0;
+ 
++#ifdef MSYS2_PACMAN_LINUX
++	_alpm_log(handle, ALPM_LOG_WARNING, _("skipping chroot scriptlet execution (MSYS2 tools unavailable)\n"));
++	return 0;
++#endif
++
+ #define HEAD 1
+ #define TAIL 0
+ 
