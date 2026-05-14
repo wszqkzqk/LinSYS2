@@ -97,6 +97,8 @@ install:
 	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
 	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2 > $(DESTDIR)$(PREFIX)/bin/linsys2
 	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2
+	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2-makepkg > $(DESTDIR)$(PREFIX)/bin/linsys2-makepkg
+	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2-makepkg
 	install -Dm644 README.md $(DESTDIR)$(PREFIX)/share/doc/linsys2-pacman/README.md
 	install -Dm644 COPYING $(DESTDIR)$(PREFIX)/share/licenses/linsys2-pacman/COPYING
 
