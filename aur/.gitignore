@@ -4,6 +4,8 @@
 *.pyd
 
 linsys2/*
+msys2-pacman/
+MSYS2-keyring/
 pkg/*
 src/*
 __pycache__/

@@ -8,7 +8,7 @@ build/
 /src/
 /pkg/
 
-
+*.log
 
 # Pacman databases and caches
 *.db
@@ -30,6 +30,11 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# makepkg git source bare clones (when SRCDEST is not set)
+/msys2-pacman/
+/MSYS2-keyring/
+/linsys2/
 
 # Submodule should remain clean
 # (patches are applied during build, not stored in submodule)
