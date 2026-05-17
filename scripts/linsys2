@@ -96,7 +96,8 @@ def winepath_unix_to_windows(unix_path, env=None):
     try:
         result = subprocess.run(
             ["winepath", "-w", str(unix_path)],
-            capture_output=True, text=True, check=True, env=env
+            capture_output=True, encoding="utf-8",
+            check=True, env=env
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError:
@@ -110,7 +111,8 @@ def wine_registry_get(path, value, env=None):
     try:
         result = subprocess.run(
             ["wine", "reg", "query", path, "/v", value],
-            capture_output=True, text=True, check=True, env=env
+            capture_output=True, encoding="utf-8",
+            check=True, env=env
         )
         for line in result.stdout.splitlines():
             if value in line:
@@ -166,6 +168,7 @@ def _register_bin_to_prefix(wineprefix, bin_dir):
     """
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
@@ -274,6 +277,7 @@ def cmd_unregister(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
@@ -320,6 +324,7 @@ def cmd_env(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
@@ -384,10 +389,13 @@ def cmd_run(args):
     env["WINEPREFIX"] = str(wineprefix)
 
     if bin_dir.exists():
+        winepath_env = env.copy()
+        winepath_env["LC_ALL"] = "C.UTF-8"
         try:
             wine_lib_path = subprocess.run(
                 ["winepath", "-w", str(bin_dir)],
-                capture_output=True, text=True, check=True, env=env
+                capture_output=True, encoding="utf-8",
+                check=True, env=winepath_env
             ).stdout.strip()
             env["WINEPATH"] = wine_lib_path
         except subprocess.CalledProcessError:
@@ -420,10 +428,13 @@ def cmd_shell(args):
     if bin_dir.exists():
         old_path = env.get("PATH")
         env["PATH"] = f"{bin_dir}" + (":" + old_path if old_path else "")
+        winepath_env = env.copy()
+        winepath_env["LC_ALL"] = "C.UTF-8"
         try:
             wine_lib_path = subprocess.run(
                 ["winepath", "-w", str(bin_dir)],
-                capture_output=True, text=True, check=True, env=env
+                capture_output=True, encoding="utf-8",
+                check=True, env=winepath_env
             ).stdout.strip()
             env["WINEPATH"] = wine_lib_path
         except subprocess.CalledProcessError:
