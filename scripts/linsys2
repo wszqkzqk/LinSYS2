@@ -186,6 +186,50 @@ def _register_bin_to_prefix(wineprefix, bin_dir):
     return False
 
 
+def _set_pango_backend(wineprefix):
+    """Set PANGOCAIRO_BACKEND=fontconfig in Wine registry.
+
+    GTK programs on MSYS2 use PangoWin32 backend by default, which
+    bypasses Wine's FontSubstitutes/FontLink fallback mechanism.
+    Forcing the fontconfig backend ensures proper font resolution
+    under Wine via the host fontconfig infrastructure.
+    """
+    env = os.environ.copy()
+    env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
+    subprocess.run(
+        ["wine", "reg", "add", r"HKEY_CURRENT_USER\Environment",
+         "/v", "PANGOCAIRO_BACKEND", "/t", "REG_SZ",
+         "/d", "fontconfig", "/f"],
+        check=True, capture_output=True, env=env
+    )
+
+
+def _delete_pango_backend(wineprefix):
+    """Remove PANGOCAIRO_BACKEND from Wine registry.
+
+    Only removes if the current value is 'fontconfig' (i.e. we set it).
+    If the user has overridden it, leave it alone.
+    """
+    env = os.environ.copy()
+    env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
+
+    current = wine_registry_get(
+        r"HKEY_CURRENT_USER\Environment",
+        "PANGOCAIRO_BACKEND",
+        env=env
+    )
+    if current != "fontconfig":
+        return
+
+    subprocess.run(
+        ["wine", "reg", "delete", r"HKEY_CURRENT_USER\Environment",
+         "/v", "PANGOCAIRO_BACKEND", "/f"],
+        check=False, capture_output=True, env=env
+    )
+
+
 def cmd_init(args):
     """Initialize Wine integration for an environment."""
     env_name = args.env
@@ -214,6 +258,13 @@ def cmd_init(args):
     config_file = get_env_dir(env_name) / "wine.config"
     with open(config_file, "w") as f:
         f.write(f"WINEPREFIX={wineprefix}\n")
+
+    # Set Pango font backend for proper font rendering under Wine
+    info("Configuring font backend...")
+    try:
+        _set_pango_backend(wineprefix)
+    except subprocess.CalledProcessError as e:
+        warn(f"Failed to set font backend: {e}")
 
     # Auto-register bin directory to project-managed prefix
     bin_dir = get_bin_dir(env_name)
@@ -260,7 +311,14 @@ def cmd_register(args):
     else:
         info(f"Registered {env_name} bin directory to Wine PATH")
         info(f"Target prefix: {wineprefix}")
-        info("Restart Wine applications for changes to take effect")
+
+    try:
+        _set_pango_backend(wineprefix)
+    except subprocess.CalledProcessError as e:
+        error(f"Failed to set font backend: {e}")
+        return 1
+
+    info("Restart Wine applications for changes to take effect")
     return 0
 
 
@@ -302,6 +360,12 @@ def cmd_unregister(args):
         error(f"Failed to modify Wine registry: {e}")
         return 1
 
+    try:
+        _delete_pango_backend(wineprefix)
+    except subprocess.CalledProcessError as e:
+        error(f"Failed to remove font backend: {e}")
+        # non-fatal; PATH unregistration succeeded
+
     info(f"Unregistered {env_name} bin directory from Wine PATH")
     return 0
 
@@ -340,6 +404,13 @@ def cmd_env(args):
                 registered = True
 
     print(f"\nRegistration status: {'registered' if registered else 'not registered'}")
+
+    pango_backend = wine_registry_get(
+        r"HKEY_CURRENT_USER\Environment",
+        "PANGOCAIRO_BACKEND",
+        env=env
+    )
+    print(f"Font backend:    {pango_backend if pango_backend else 'default (PangoWin32)'}")
     return 0
 
 
@@ -387,6 +458,7 @@ def cmd_run(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
         winepath_env = env.copy()
@@ -424,6 +496,7 @@ def cmd_shell(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
         old_path = env.get("PATH")
