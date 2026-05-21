@@ -367,11 +367,26 @@ def cmd_unregister(args):
         error(f"Failed to modify Wine registry: {e}")
         return 1
 
-    try:
-        _delete_pango_backend(wineprefix)
-    except subprocess.CalledProcessError as e:
-        error(f"Failed to remove font backend: {e}")
-        # non-fatal; PATH unregistration succeeded
+    # Only remove PANGOCAIRO_BACKEND if no other LinSYS2 environments remain
+    remaining_entries = [_normalize_wine_path(p) for p in new_path.split(";") if p.strip()]
+    has_other_linsys2 = False
+    for other_env_name in ENVIRONMENTS:
+        if other_env_name == env_name:
+            continue
+        other_bin_dir = get_bin_dir(other_env_name)
+        other_win_bin_path = winepath_unix_to_windows(other_bin_dir, env=env)
+        if _normalize_wine_path(other_win_bin_path) in remaining_entries:
+            has_other_linsys2 = True
+            break
+
+    if not has_other_linsys2:
+        try:
+            _delete_pango_backend(wineprefix)
+        except subprocess.CalledProcessError as e:
+            error(f"Failed to remove font backend: {e}")
+            # non-fatal; PATH unregistration succeeded
+    else:
+        info("Other LinSYS2 environments remain registered, keeping font backend")
 
     info(f"Unregistered {env_name} bin directory from Wine PATH")
     return 0
