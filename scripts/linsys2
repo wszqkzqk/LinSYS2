@@ -164,7 +164,8 @@ def _normalize_wine_path(path):
 def _register_bin_to_prefix(wineprefix, bin_dir):
     """Register bin directory to a specific WINEPREFIX registry PATH.
 
-    Returns True if already registered, False if just registered.
+    The bin directory is always moved to the front (top priority).
+    Returns True if already at the front, False otherwise.
     """
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
@@ -174,15 +175,21 @@ def _register_bin_to_prefix(wineprefix, bin_dir):
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
 
     norm_target = _normalize_wine_path(win_bin_path)
-    path_entries = [_normalize_wine_path(p) for p in current_path.split(";") if p.strip()]
-    if norm_target in path_entries:
+    original_entries = [p for p in current_path.split(";") if p.strip()]
+    norm_entries = [_normalize_wine_path(p) for p in original_entries]
+
+    if norm_entries and norm_entries[0] == norm_target:
         return True
 
-    new_path = win_bin_path
-    if current_path:
-        new_path += ";" + current_path
+    filtered = [p for p in original_entries if _normalize_wine_path(p) != norm_target]
 
-    set_wine_path(new_path, env=env)
+    new_path = win_bin_path
+    if filtered:
+        new_path += ";" + ";".join(filtered)
+
+    if new_path != current_path:
+        set_wine_path(new_path, env=env)
+
     return False
 
 
