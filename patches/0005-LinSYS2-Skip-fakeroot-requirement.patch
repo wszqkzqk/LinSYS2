@@ -1,0 +1,13 @@
+diff --git a/scripts/libmakepkg/executable/fakeroot.sh.in b/scripts/libmakepkg/executable/fakeroot.sh.in
+index 4159ba41..243ba865 100644
+--- a/scripts/libmakepkg/executable/fakeroot.sh.in
++++ b/scripts/libmakepkg/executable/fakeroot.sh.in
+@@ -28,7 +28,7 @@ source "$MAKEPKG_LIBRARY/util/message.sh"
+ executable_functions+=('executable_fakeroot')
+ 
+ executable_fakeroot() {
+-	if (( SOURCEONLY || BUILDPKG )); then
++	if (( SOURCEONLY || BUILDPKG )) && [[ -z $MSYS2_PACMAN_LINUX ]]; then
+ 		if ! type -p fakeroot >/dev/null; then
+ 			error "$(gettext "Cannot find the %s binary.")" "fakeroot"
+ 			return 1

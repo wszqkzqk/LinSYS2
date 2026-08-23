@@ -24,7 +24,8 @@ SUBMODULE = vendor/msys2-pacman
 PATCHES = patches/0001-LinSYS2-Adapt-MSYS2-pacman-for-Linux.patch \
           patches/0002-LinSYS2-Accept-non-mingw-deps-as-host-provided.patch \
           patches/0003-LinSYS2-Install-bash-completion-under-prefix.patch \
-          patches/0004-LinSYS2-Skip-chroot-scriptlet-execution.patch
+          patches/0004-LinSYS2-Skip-chroot-scriptlet-execution.patch \
+          patches/0005-LinSYS2-Skip-fakeroot-requirement.patch
 BUILD_DIR = $(SUBMODULE)/build
 PATCH_STAMP = $(SUBMODULE)/.linsys2-patched.stamp
 
@@ -97,6 +98,12 @@ install:
 	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2-pacman
 	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2 > $(DESTDIR)$(PREFIX)/bin/linsys2
 	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2
+	@sed 's/@VERSION@/$(VERSION)/g' scripts/linsys2-makepkg > $(DESTDIR)$(PREFIX)/bin/linsys2-makepkg
+	@chmod 755 $(DESTDIR)$(PREFIX)/bin/linsys2-makepkg
+	install -Dm644 etc/makepkg_linsys2.conf $(DESTDIR)$(PRIVATE_PREFIX)/etc/makepkg_linsys2.conf
+	@for c in etc/makepkg_linsys2.d/*.conf; do \
+		install -Dm644 "$$c" $(DESTDIR)$(PRIVATE_PREFIX)/etc/makepkg_linsys2.d/$$(basename $$c) || exit 1; \
+	done
 	install -Dm644 README.md $(DESTDIR)$(PREFIX)/share/doc/linsys2-pacman/README.md
 	install -Dm644 COPYING $(DESTDIR)$(PREFIX)/share/licenses/linsys2-pacman/COPYING
 

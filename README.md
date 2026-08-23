@@ -58,12 +58,13 @@ LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB
 
 ## How It Works
 
-LinSYS2 has two commands:
+LinSYS2 has three commands:
 
 | Command | Purpose |
 |---------|---------|
 | `linsys2-pacman` | Package management — install, remove, and upgrade Windows packages from MSYS2 repos |
 | `linsys2` | Wine integration — run programs, manage PATH registration, inspect environments |
+| `linsys2-makepkg` | Package building — build [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs on Linux, like MSYS2's `makepkg-mingw` |
 
 Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages install to `~/.local/share/linsys2/`.
 
@@ -98,14 +99,14 @@ makepkg -si
 Other distributions should install the equivalent packages under their own package names.
 
 * **Build dependencies:** `meson ninja-build gcc make git patch pkg-config libarchive libssl libgpgme libcurl`
-* **Runtime dependencies:** `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python`
+* **Runtime dependencies:** `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python bubblewrap`
 
 On Debian/Ubuntu:
 
 ```bash
 sudo apt install meson ninja-build gcc make git patch pkg-config \
     libarchive-dev libssl-dev libgpgme-dev libcurl4-openssl-dev \
-    gawk gettext which gnupg wine python3
+    gawk gettext which gnupg wine python3 bubblewrap
 ```
 
 On Fedora:
@@ -113,7 +114,7 @@ On Fedora:
 ```bash
 sudo dnf install meson ninja-build gcc make git patch pkg-config \
     libarchive-devel openssl-devel gpgme-devel libcurl-devel \
-    gawk gettext which gnupg wine python3
+    gawk gettext which gnupg wine python3 bubblewrap
 ```
 
 Build and install:
@@ -187,6 +188,38 @@ linsys2 register    # add bin directory to your Wine PATH registry
 linsys2 env         # inspect registration
 linsys2 unregister  # remove from Wine PATH
 ```
+
+### Building Packages (`linsys2-makepkg`)
+
+`linsys2-makepkg` builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux — like MSYS2's `makepkg-mingw`, but no Windows required. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine, with no wrapper scripts involved:
+
+* `binfmt_misc` executes PE binaries through Wine transparently, so `foo.exe` is directly executable.
+* For each `foo.exe` in the environment's bin directory a plain `foo -> foo.exe` symlink is created next to it, so shell lookups like `gcc` resolve. They must live in the bin dir itself: under Wine the executable's own directory drives the DLL search order and self-located resources (GCC's specs, CMake's modules). `linsys2-pacman` regenerates them after every `-S`/`-R`/`-U`, so removed packages leave no stale entries; only the exact generated pattern (`foo -> foo.exe`) is ever touched.
+* The build runs inside a private mount namespace (via `bubblewrap`) where the environment prefix is bind-mounted at its canonical location (e.g. `/ucrt64`). Native processes and Wine processes (through the `Z:` drive) therefore see the same absolute paths that msys-style build scripts hard-code.
+
+```bash
+# Clone MINGW-packages and build a package
+git clone https://github.com/msys2/MINGW-packages.git
+cd MINGW-packages/mingw-w64-zlib
+
+# Build (installs mingw build dependencies into the environment with -s)
+linsys2-makepkg -s
+
+# Target a non-default environment
+linsys2-makepkg --env clang64 -s
+
+# Build for several environments in one go (like makepkg-mingw)
+MINGW_ARCH="ucrt64 clang64" linsys2-makepkg -s
+
+# Install the result
+linsys2-pacman -U mingw-w64-ucrt-x86_64-zlib-*-any.pkg.tar.zst
+```
+
+All state stays inside `~/.local/share/linsys2/<env>/`; builds only write to the PKGBUILD directory (`src/`, `pkg/`, `*.pkg.tar.zst`), following makepkg conventions.
+
+> **Required one-time setup (root):** `linsys2-makepkg` needs a `binfmt_misc` registration that runs PE binaries (magic `MZ`) through Wine, so that compiler output and configure-time test programs execute transparently. Most distributions ship this already (e.g. systemd's `DOSWin` registration); when it is missing, `linsys2-makepkg` refuses to build and prints the exact registration command.
+
+Known limitations: `check()` is disabled by default (test suites typically execute freshly built PE binaries through MSYS `exec` semantics that do not exist here — pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
 
 ---
 

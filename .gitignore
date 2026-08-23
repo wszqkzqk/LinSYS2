@@ -3,6 +3,7 @@ dist/
 build/
 *.tar.zst
 *.pkg.tar.*
+.stage/
 
 # Arch Linux makepkg directories
 /src/
