@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <clipPath id="badge">
+      <rect x="96" y="96" width="832" height="832" rx="190" ry="190"/>
+    </clipPath>
+  </defs>
+
+  <!-- Badge: left = Linux terminal (dark), right = MSYS2 window (blue), S-curve seam -->
+  <g clip-path="url(#badge)">
+    <rect x="96" y="96" width="832" height="832" fill="#2C3947"/>
+    <path d="M 512 96 C 716 246, 308 426, 512 512 C 716 598, 308 778, 512 928 L 928 928 L 928 96 Z" fill="#2B7DE1"/>
+  </g>
+
+  <!-- Window dots on the blue side -->
+  <g fill="#FFFFFF" opacity="0.92">
+    <circle cx="668" cy="182" r="24"/>
+    <circle cx="756" cy="182" r="24"/>
+    <circle cx="844" cy="182" r="24"/>
+  </g>
+
+  <!-- Terminal prompt >_ on the dark side -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="56" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 206 436 L 322 528 L 206 620"/>
+    <path d="M 366 620 L 486 620"/>
+  </g>
+
+  <!-- Package cube on the blue side -->
+  <g stroke-linejoin="round">
+    <polygon points="700,372 826,445 700,518 574,445" fill="#FFFFFF"/>
+    <polygon points="574,445 700,518 700,662 574,589" fill="#EAF1FB"/>
+    <polygon points="700,518 826,445 826,589 700,662" fill="#D8E6F8"/>
+    <path d="M 700 372 L 700 662" fill="none" stroke="#2B7DE1" stroke-width="26"/>
+  </g>
+</svg>
