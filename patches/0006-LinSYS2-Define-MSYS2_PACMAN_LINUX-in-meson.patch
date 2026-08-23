@@ -1,0 +1,14 @@
+diff --git a/meson.build b/meson.build
+index 79fc3ef..412ae0b 100644
+--- a/meson.build
++++ b/meson.build
+@@ -14,6 +14,9 @@ libalpm_version = '14.0.0'
+ 
+ cc = meson.get_compiler('c')
+ 
++# This fork targets Linux hosts, not MSYS2 (LinSYS2)
++add_project_arguments('-DMSYS2_PACMAN_LINUX', language : 'c')
++
+ # commandline options
+ PREFIX = get_option('prefix')
+ DATAROOTDIR = join_paths(PREFIX, get_option('datarootdir'))

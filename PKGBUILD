@@ -8,7 +8,7 @@ arch=('x86_64' 'aarch64' 'riscv64' 'loong64')
 url='https://github.com/wszqkzqk/LinSYS2'
 license=('GPL-2.0-or-later')
 depends=('bash' 'bubblewrap' 'coreutils' 'curl' 'gawk' 'gettext' 'glibc' 'gnupg' 'gpgme' 'grep' 'libarchive' 'openssl' 'which' 'bzip2' 'xz' 'zstd' 'wine' 'python')
-makedepends=('git' 'meson' 'ninja' 'asciidoc' 'doxygen' 'gcc' 'patch')
+makedepends=('git' 'meson' 'ninja' 'gcc' 'patch')
 source=("${pkgname}::git+file://${startdir}"
         "git+https://github.com/msys2/msys2-pacman.git"
         "git+https://github.com/msys2/MSYS2-keyring.git")
@@ -27,17 +27,20 @@ pkgver() {
 prepare() {
     cd "${pkgname}"
     git submodule init
-    git submodule set-url vendor/msys2-pacman "$srcdir"/msys2-pacman
+    git submodule set-url subprojects/msys2-pacman "$srcdir"/msys2-pacman
     git submodule set-url vendor/msys2-keyring "$srcdir"/MSYS2-keyring
     git -c protocol.file.allow=always submodule update
 }
 
 build() {
     cd "${pkgname}"
-    make
+    # arch-meson's --prefix=/usr comes first; this later one wins and keeps
+    # the toolchain in its private home. The other Arch flags still apply.
+    arch-meson build --prefix=/usr/lib/linsys2-pacman
+    meson compile -C build
 }
 
 package() {
     cd "${pkgname}"
-    make DESTDIR="${pkgdir}" PREFIX=/usr install
+    DESTDIR="${pkgdir}" meson install -C build
 }

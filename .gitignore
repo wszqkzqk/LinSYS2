@@ -6,8 +6,10 @@ build/
 .stage/
 
 # Arch Linux makepkg directories
-/src/
 /pkg/
+
+# Meson subproject lock
+subprojects/.wraplock
 
 *.log
 

@@ -64,7 +64,7 @@ LinSYS2 has three commands:
 |---------|---------|
 | `linsys2-pacman` | Package management — install, remove, and upgrade Windows packages from MSYS2 repos |
 | `linsys2` | Wine integration — run programs, manage PATH registration, inspect environments |
-| `linsys2-makepkg` | Package building — build [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs on Linux, like MSYS2's `makepkg-mingw` |
+| `linsys2-makepkg` | Package building (**experimental**) — build [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs on Linux, like MSYS2's `makepkg-mingw` |
 
 Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages install to `~/.local/share/linsys2/`.
 
@@ -98,13 +98,13 @@ makepkg -si
 
 Other distributions should install the equivalent packages under their own package names.
 
-* **Build dependencies:** `meson ninja-build gcc make git patch pkg-config libarchive libssl libgpgme libcurl`
+* **Build dependencies:** `meson ninja-build gcc git patch pkg-config libarchive libssl libgpgme libcurl`
 * **Runtime dependencies:** `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python bubblewrap`
 
 On Debian/Ubuntu:
 
 ```bash
-sudo apt install meson ninja-build gcc make git patch pkg-config \
+sudo apt install meson ninja-build gcc git patch pkg-config \
     libarchive-dev libssl-dev libgpgme-dev libcurl4-openssl-dev \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
@@ -112,17 +112,20 @@ sudo apt install meson ninja-build gcc make git patch pkg-config \
 On Fedora:
 
 ```bash
-sudo dnf install meson ninja-build gcc make git patch pkg-config \
+sudo dnf install meson ninja-build gcc git patch pkg-config \
     libarchive-devel openssl-devel gpgme-devel libcurl-devel \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
 
-Build and install:
+Build and install (the toolchain lands in its private home
+`/usr/lib/linsys2-pacman`; only the three commands go to `/usr/bin`):
 
 ```bash
 git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
 cd LinSYS2
-make && sudo make PREFIX=/usr install
+meson setup build
+meson compile -C build
+sudo meson install -C build
 ```
 
 ---
@@ -189,7 +192,9 @@ linsys2 env         # inspect registration
 linsys2 unregister  # remove from Wine PATH
 ```
 
-### Building Packages (`linsys2-makepkg`)
+### Building Packages (`linsys2-makepkg`, experimental)
+
+> **Experimental:** many packages build fine, but expect rough edges and per-package quirks.
 
 `linsys2-makepkg` builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux — like MSYS2's `makepkg-mingw`, but no Windows required. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine, with no wrapper scripts involved:
 

@@ -1,0 +1,4 @@
+from pathlib import Path
+
+PRIVATE_PREFIX = Path("@private_prefix@")
+BIN_DIR = Path("@bin_dir@")

@@ -1,5 +1,5 @@
 [submodule "vendor/msys2-pacman"]
-	path = vendor/msys2-pacman
+	path = subprojects/msys2-pacman
 	url = https://github.com/msys2/msys2-pacman.git
 [submodule "vendor/msys2-keyring"]
 	path = vendor/msys2-keyring
