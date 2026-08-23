@@ -1,15 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <defs>
-    <clipPath id="badge">
-      <rect x="96" y="96" width="832" height="832" rx="190" ry="190"/>
-    </clipPath>
-  </defs>
-
-  <!-- Badge: left = Linux terminal (dark), right = MSYS2 window (blue), S-curve seam -->
-  <g clip-path="url(#badge)">
-    <rect x="96" y="96" width="832" height="832" fill="#2C3947"/>
-    <path d="M 512 96 C 716 246, 308 426, 512 512 C 716 598, 308 778, 512 928 L 928 928 L 928 96 Z" fill="#2B7DE1"/>
-  </g>
+  <!-- Badge: left = Linux terminal (dark), right = MSYS2 window (blue), S-curve seam.
+       Rounded corners are baked into the paths (no clip-path) for QtSvg/KDE compatibility. -->
+  <rect x="96" y="96" width="832" height="832" rx="190" ry="190" fill="#2C3947"/>
+  <path d="M 512 96 C 716 246, 308 426, 512 512 C 716 598, 308 778, 512 928 L 738 928 A 190 190 0 0 0 928 738 L 928 286 A 190 190 0 0 0 738 96 Z" fill="#2B7DE1"/>
 
   <!-- Window dots on the blue side -->
   <g fill="#FFFFFF" opacity="0.92">
