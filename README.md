@@ -7,11 +7,7 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2+-blue.svg)](COPYING)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wszqkzqk/LinSYS2)
 
-**Build, debug, and run Windows programs on Linux with the full MSYS2 ecosystem.**
-
-**No VM. No dual-boot. No containers.**
-
-LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux — the **actual Windows toolchain and libraries** from MSYS2 repositories, running through [Wine](https://www.winehq.org/). You are building Windows binaries with the same toolchain that runs on Windows. Not a Linux port that behaves differently.
+LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux: the same Windows toolchain and libraries that run on Windows, executed through [Wine](https://www.winehq.org/). No VM, no dual-boot, no containers.
 
 ---
 
@@ -25,15 +21,13 @@ linsys2-pacman -Sy mingw-w64-ucrt-x86_64-gcc
 linsys2 run -- gcc -v
 ```
 
-Two commands. You just installed and ran a Windows program without leaving Linux!
-
 ---
 
 ## Why LinSYS2
 
-Traditional cross-compilation installs a Linux port of the MinGW toolchain. You compile with it, but the build process differs from Windows — and you cannot run or debug the result.
+Traditional cross-compilation uses a Linux port of the MinGW toolchain: the build process differs from Windows, and you cannot run or debug the result.
 
-LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB. Same build process. You compile, debug, and run exactly as you would on Windows — from your Linux shell.
+LinSYS2 installs the actual Windows toolchain from MSYS2, so compiling, debugging, and running work exactly as they do on Windows, from your Linux shell.
 
 | | Traditional Cross-Compile | LinSYS2 |
 |---|---|---|
@@ -48,11 +42,11 @@ LinSYS2 installs the **actual Windows toolchain** from MSYS2. Same GCC. Same GDB
 
 ## Features
 
-- **Same toolchain as Windows** — install the actual Windows GCC/LLVM, GDB/LLDB, and CMake/Meson, etc. Not a Linux cross-compiler port. Identical libraries. Identical behavior. Identical binaries.
-- **Full dev lifecycle on Linux** — install packages, compile, debug, run tests, and ship Windows binaries, all from your Linux shell
-- **No VM, no containers** — runs through Wine at near-native speed
-- **User-level isolation** — everything lives in `~/.local/share/linsys2/`. No root, no system conflicts
-- **Multi-target** — ucrt64, clang64, and clangarm64 from a single machine
+- Same toolchain as Windows: the Windows GCC/LLVM, GDB/LLDB, and CMake/Meson from MSYS2, not a Linux cross-compiler port
+- Full dev lifecycle on Linux: install packages, compile, debug, run tests, and ship Windows binaries from your Linux shell
+- Runs through Wine at near-native speed, no VM or containers
+- Everything lives in `~/.local/share/linsys2/`, no root or system conflicts
+- Multiple targets (ucrt64, clang64, clangarm64) from one machine
 
 ---
 
@@ -62,13 +56,13 @@ LinSYS2 has three commands:
 
 | Command | Purpose |
 |---------|---------|
-| `linsys2-pacman` | Package management — install, remove, and upgrade Windows packages from MSYS2 repos |
-| `linsys2` | Wine integration — run programs, manage PATH registration, inspect environments |
-| `linsys2-makepkg` | Package building (**experimental**) — build [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs on Linux, like MSYS2's `makepkg-mingw` |
+| `linsys2-pacman` | Package management: install, remove, and upgrade Windows packages from MSYS2 repos |
+| `linsys2` | Wine integration: run programs, manage PATH registration, inspect environments |
+| `linsys2-makepkg` | Package building (experimental): build [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs on Linux, like MSYS2's `makepkg-mingw` |
 
-Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages install to `~/.local/share/linsys2/`.
+`linsys2-pacman` runs the patched [MSYS2 fork of pacman](https://github.com/msys2/msys2-pacman) built for Linux, pointed at MSYS2's official repositories. Packages install to `~/.local/share/linsys2/`.
 
-`linsys2 run` uses an isolated Wine prefix and injects the environment via `WINEPATH` — no setup, no registry changes, no pollution of your existing `~/.wine`. If you prefer, `linsys2 register` adds the environment to your existing Wine installation instead.
+`linsys2 run` uses an isolated Wine prefix and injects the environment via `WINEPATH`, so there is no setup, no registry changes, and no interference with your existing `~/.wine`. If you prefer, `linsys2 register` adds the environment to your existing Wine installation instead.
 
 ---
 
@@ -76,7 +70,7 @@ Under the hood, `linsys2-pacman` runs the patched [MSYS2 fork of pacman](https:/
 
 ### Arch Linux
 
-**From AUR** (recommended):
+From AUR (recommended):
 
 ```bash
 # Using yay
@@ -86,7 +80,7 @@ yay -S linsys2
 paru -S linsys2
 ```
 
-**Build manually**:
+Or build manually:
 
 ```bash
 git clone --recursive https://github.com/wszqkzqk/LinSYS2.git
@@ -98,8 +92,8 @@ makepkg -si
 
 Other distributions should install the equivalent packages under their own package names.
 
-* **Build dependencies:** `meson ninja-build gcc git patch pkg-config libarchive libssl libgpgme libcurl`
-* **Runtime dependencies:** `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python bubblewrap`
+* Build dependencies: `meson ninja-build gcc git patch pkg-config libarchive libssl libgpgme libcurl`
+* Runtime dependencies: `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python bubblewrap`
 
 On Debian/Ubuntu:
 
@@ -156,9 +150,9 @@ linsys2-pacman --env clang64 -S mingw-w64-clang-x86_64-llvm
 
 ### Build, Debug, Run (`linsys2`)
 
-#### Isolated WINEPREFIX (Recommended)
+#### Isolated Wine Prefix
 
-`linsys2 run` works out of the box. It uses an isolated Wine prefix under `~/.local/share/linsys2/` and injects the environment's bin directory via `WINEPATH` — no prior setup, no registry changes, no pollution of your existing Wine installation.
+`linsys2 run` works out of the box. It uses an isolated Wine prefix under `~/.local/share/linsys2/` and injects the environment's bin directory via `WINEPATH`, so there is no prior setup, no registry changes, and no interference with your existing Wine installation.
 
 ```bash
 # Compile a Windows executable with Windows GCC
@@ -180,11 +174,11 @@ linsys2 run -- ./example.exe --your-flags
 linsys2 shell
 ```
 
-> **Always use `--`** to separate `linsys2` options from the program's own flags.
+Always use `--` to separate `linsys2` options from the program's own flags.
 
 #### Existing Wine Integration
 
-Your **existing** Wine environment (`~/.wine` or `$WINEPREFIX`) is also supported:
+Your existing Wine environment (`~/.wine` or `$WINEPREFIX`) is also supported:
 
 ```bash
 linsys2 register    # add bin directory to your Wine PATH registry
@@ -194,13 +188,13 @@ linsys2 unregister  # remove from Wine PATH
 
 ### Building Packages (`linsys2-makepkg`, experimental)
 
-> **Experimental:** many packages build fine, but expect rough edges and per-package quirks.
+`linsys2-makepkg` is experimental: many packages build fine, but expect rough edges and per-package quirks.
 
-`linsys2-makepkg` builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux — like MSYS2's `makepkg-mingw`, but no Windows required. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine:
+It builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux, like MSYS2's `makepkg-mingw` but without Windows. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine:
 
-* `binfmt_misc` executes PE binaries through Wine transparently, so `foo.exe` is directly executable — including configure's freshly compiled test programs.
-* Bare names like `gcc` resolve through small wrapper scripts in a private shim directory (`build-bin/`), which exec the real `.exe` via Wine with the environment's `WINEPREFIX`. Because Wine is pointed at the real executable, its module path — which drives the DLL search order and self-located resources (GCC's specs, CMake's modules) — is identical to running the `.exe` directly. The shim directory is exclusively ours: `linsys2-makepkg` regenerates it before each build, and nothing is ever written into the package-managed bin directory.
-* The build runs inside a private mount namespace (via `bubblewrap`) where the environment prefix is bind-mounted at its canonical location (e.g. `/ucrt64`). Native processes and Wine processes (through the `Z:` drive) therefore see the same absolute paths that msys-style build scripts hard-code.
+* `binfmt_misc` runs PE binaries through Wine transparently, so `foo.exe` is directly executable, including configure's freshly compiled test programs.
+* Bare names like `gcc` resolve through small wrapper scripts in a private shim directory (`build-bin/`) that exec the real `.exe` via Wine with the environment's `WINEPREFIX`. Because Wine is pointed at the real executable, its module path (DLL search order and self-located resources like GCC's specs and CMake's modules) is identical to running the `.exe` directly. The shim directory is exclusively ours: `linsys2-makepkg` regenerates it before each build and never writes into the package-managed bin directory.
+* The build runs inside a private `bubblewrap` mount namespace where the environment prefix is bind-mounted at its canonical location (`/ucrt64`, ...), so native processes and Wine processes (through the `Z:` drive) see the same absolute paths that msys-style build scripts hard-code.
 
 ```bash
 # Clone MINGW-packages and build a package
@@ -222,9 +216,16 @@ linsys2-pacman -U mingw-w64-ucrt-x86_64-zlib-*-any.pkg.tar.zst
 
 All state stays inside `~/.local/share/linsys2/<env>/`; builds only write to the PKGBUILD directory (`src/`, `pkg/`, `*.pkg.tar.zst`), following makepkg conventions.
 
-> **Required one-time setup (root):** `linsys2-makepkg` needs a `binfmt_misc` registration that runs PE binaries (magic `MZ`) through Wine, so that compiler output and configure-time test programs execute transparently. Most distributions ship this already (e.g. systemd's `DOSWin` registration); when it is missing, `linsys2-makepkg` refuses to build and prints the exact registration command.
+Building also needs a one-time root setup: the kernel's `binfmt_misc` must dispatch Windows binaries to Wine. Most distributions already register this (systemd's `DOSWin` entry). If yours does not:
 
-Known limitations: `check()` is disabled by default (test suites typically execute freshly built PE binaries through MSYS `exec` semantics that do not exist here — pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
+```bash
+echo ':DOSWin:M::MZ::/usr/bin/wine:F' | sudo tee /etc/binfmt.d/linsys2-wine.conf
+sudo systemctl restart systemd-binfmt
+```
+
+In a container, register on the host; the `F` flag makes it work inside the container too.
+
+Known limitations: `check()` is disabled by default because test suites usually execute freshly built PE binaries through MSYS `exec` semantics that do not exist here (pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
 
 ---
 
