@@ -196,10 +196,10 @@ linsys2 unregister  # remove from Wine PATH
 
 > **Experimental:** many packages build fine, but expect rough edges and per-package quirks.
 
-`linsys2-makepkg` builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux — like MSYS2's `makepkg-mingw`, but no Windows required. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine, with no wrapper scripts involved:
+`linsys2-makepkg` builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux — like MSYS2's `makepkg-mingw`, but no Windows required. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine:
 
-* `binfmt_misc` executes PE binaries through Wine transparently, so `foo.exe` is directly executable.
-* For each `foo.exe` in the environment's bin directory a plain `foo -> foo.exe` symlink is created next to it, so shell lookups like `gcc` resolve. They must live in the bin dir itself: under Wine the executable's own directory drives the DLL search order and self-located resources (GCC's specs, CMake's modules). `linsys2-pacman` regenerates them after every `-S`/`-R`/`-U`, so removed packages leave no stale entries; only the exact generated pattern (`foo -> foo.exe`) is ever touched.
+* `binfmt_misc` executes PE binaries through Wine transparently, so `foo.exe` is directly executable — including configure's freshly compiled test programs.
+* Bare names like `gcc` resolve through small wrapper scripts in a private shim directory (`build-bin/`), which exec the real `.exe` via Wine with the environment's `WINEPREFIX`. Because Wine is pointed at the real executable, its module path — which drives the DLL search order and self-located resources (GCC's specs, CMake's modules) — is identical to running the `.exe` directly. The shim directory is exclusively ours: `linsys2-makepkg` regenerates it before each build, and nothing is ever written into the package-managed bin directory.
 * The build runs inside a private mount namespace (via `bubblewrap`) where the environment prefix is bind-mounted at its canonical location (e.g. `/ucrt64`). Native processes and Wine processes (through the `Z:` drive) therefore see the same absolute paths that msys-style build scripts hard-code.
 
 ```bash

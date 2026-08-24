@@ -6,9 +6,10 @@ from unittest import mock
 
 import linsys2.common as common
 from linsys2.cli_makepkg import (
+    WRAPPER_MARKER,
     binfmt_registered,
     build_bwrap_argv,
-    ensure_tool_links,
+    ensure_build_bin,
 )
 
 
@@ -50,40 +51,60 @@ class TestBinfmtRegistered(unittest.TestCase):
         self.assertFalse(binfmt_registered("/nonexistent/binfmt"))
 
 
-class TestToolLinks(unittest.TestCase):
+class TestBuildBin(unittest.TestCase):
     def _make_env(self, td):
         bin_dir = Path(td) / "ucrt64" / "ucrt64" / "bin"
         bin_dir.mkdir(parents=True)
         return bin_dir
 
-    def test_create_and_prune(self):
+    def _run(self, td):
+        with mock.patch.object(common, "DATA_DIR", Path(td)):
+            ensure_build_bin("ucrt64")
+        return Path(td) / "ucrt64" / "build-bin"
+
+    def test_exe_and_bat_wrappers(self):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = self._make_env(td)
             (bin_dir / "gcc.exe").touch()
             (bin_dir / "g++.exe").touch()
-            (bin_dir / "ar").touch()          # real file, no .exe
-            os.symlink("old.exe", bin_dir / "old")      # our pattern, dangling
-            os.symlink("other.exe", bin_dir / "kept")   # foreign pattern, dangling
-            with mock.patch.object(common, "DATA_DIR", Path(td)):
-                ensure_tool_links("ucrt64")
-                self.assertEqual(os.readlink(bin_dir / "gcc"), "gcc.exe")
-                self.assertEqual(os.readlink(bin_dir / "g++"), "g++.exe")
-                self.assertFalse((bin_dir / "old").exists())
-                self.assertEqual(os.readlink(bin_dir / "kept"), "other.exe")
-                self.assertFalse((bin_dir / "ar").is_symlink())
-                # removing the .exe prunes the generated link
-                (bin_dir / "gcc.exe").unlink()
-                ensure_tool_links("ucrt64")
-                self.assertFalse((bin_dir / "gcc").exists())
+            (bin_dir / "foo.bat").touch()
+            (bin_dir / "ar").touch()  # real file, no wrapper needed
+            build_bin = self._run(td)
 
-    def test_existing_name_not_overwritten(self):
+            gcc = (build_bin / "gcc").read_text()
+            self.assertIn(WRAPPER_MARKER, gcc)
+            self.assertIn(f"export WINEPREFIX='{td}/ucrt64/wine'", gcc)
+            self.assertIn(f"exec wine '{bin_dir}/gcc.exe' \"$@\"", gcc)
+            self.assertTrue(os.access(build_bin / "gcc", os.X_OK))
+            self.assertIn("exec wine cmd /c", (build_bin / "foo").read_text())
+            self.assertFalse((build_bin / "ar").exists())
+            for shim in ("pacman", "pacman-conf", "cygpath"):
+                self.assertTrue((build_bin / shim).exists())
+
+    def test_shim_names_win_over_exe(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "pacman.exe").touch()
+            build_bin = self._run(td)
+            self.assertIn("linsys2-pacman", (build_bin / "pacman").read_text())
+
+    def test_stale_wrapper_pruned(self):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = self._make_env(td)
             (bin_dir / "gcc.exe").touch()
-            (bin_dir / "gcc").touch()          # package ships a real `gcc`
-            with mock.patch.object(common, "DATA_DIR", Path(td)):
-                ensure_tool_links("ucrt64")
-                self.assertFalse((bin_dir / "gcc").is_symlink())
+            build_bin = self._run(td)
+            self.assertTrue((build_bin / "gcc").exists())
+            (bin_dir / "gcc.exe").unlink()
+            (build_bin / "keep").write_text("#!/bin/sh\n# mine\n")
+            self._run(td)
+            self.assertFalse((build_bin / "gcc").exists())
+            self.assertTrue((build_bin / "keep").exists())
+
+    def test_missing_bin_dir_only_shims(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            self.assertEqual(sorted(p.name for p in build_bin.iterdir()),
+                             ["cygpath", "pacman", "pacman-conf"])
 
 
 class TestBwrapArgv(unittest.TestCase):

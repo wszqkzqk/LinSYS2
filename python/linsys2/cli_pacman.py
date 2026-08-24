@@ -261,29 +261,6 @@ def cmd_update_keyring(args):
     return 0
 
 
-def passthrough_mode(env_name, pacman_args):
-    result = run_pacman(env_name, pacman_args)
-    # The operation flag is not necessarily the first argument
-    # (--noconfirm may precede it), so scan them all.
-    for a in pacman_args:
-        if a.startswith(("-S", "-R", "-U")) or \
-                a in ("--sync", "--remove", "--upgrade"):
-            _refresh_tool_links(env_name)
-            break
-    return result.returncode
-
-
-def _refresh_tool_links(env_name):
-    """Best-effort: package management must keep working even if the
-    build side is broken."""
-    try:
-        from linsys2.cli_makepkg import ensure_build_bin, ensure_tool_links
-        ensure_tool_links(env_name)
-        ensure_build_bin(env_name)
-    except Exception:
-        pass
-
-
 def main():
     argv = sys.argv[1:]
 
@@ -343,4 +320,4 @@ def main():
                 return 0
             return cmd_update_keyring(parsed)
 
-    return passthrough_mode(env_name, remaining)
+    return run_pacman(env_name, remaining).returncode
