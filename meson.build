@@ -58,11 +58,18 @@ install_data(
 install_data([version_py, paths_py], install_dir : py_pkg_dir)
 install_data('python/linsys2/shims/cygpath', install_dir : py_pkg_dir / 'shims')
 
-# Entry points -> <system_prefix>/bin
-install_data(
-  ['scripts/linsys2', 'scripts/linsys2-pacman', 'scripts/linsys2-makepkg'],
-  install_dir : system_prefix / 'bin',
-  install_mode : 'rwxr-xr-x')
+# Entry points -> <system_prefix>/bin. Absolute shebang, not env: an MSYS2
+# environment's own Windows python3 can end up first on PATH.
+py = import('python').find_installation('python3')
+foreach entry : ['linsys2', 'linsys2-pacman', 'linsys2-makepkg']
+  configure_file(
+    input : 'scripts' / entry,
+    output : entry,
+    configuration : {'PYTHON3' : py.full_path()},
+    install : true,
+    install_dir : system_prefix / 'bin',
+    install_mode : 'rwxr-xr-x')
+endforeach
 
 install_data('etc/makepkg_linsys2.conf',
              install_dir : get_option('prefix') / 'etc')
@@ -86,7 +93,6 @@ meson.add_install_script(
   'sh', '-c',
   'rm -rf "$MESON_INSTALL_DESTDIR_PREFIX"/share/bash-completion')
 
-py = import('python').find_installation('python3')
 test('unit', py,
      args : ['-m', 'unittest', 'discover', '-s',
              meson.current_source_dir() / 'tests'],
