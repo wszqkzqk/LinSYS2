@@ -7,48 +7,9 @@ from unittest import mock
 import linsys2.common as common
 from linsys2.cli_makepkg import (
     WRAPPER_MARKER,
-    binfmt_registered,
     build_bwrap_argv,
     ensure_build_bin,
 )
-
-
-def _write_binfmt_entry(d, name, content):
-    (d / name).write_text(content)
-
-
-class TestBinfmtRegistered(unittest.TestCase):
-    def test_literal_mz_enabled(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            _write_binfmt_entry(d, "DOSWin",
-                                "enabled\ninterpreter /usr/bin/wine\nmagic MZ\n")
-            self.assertTrue(binfmt_registered(d))
-
-    def test_hex_magic_enabled(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            _write_binfmt_entry(d, "wine",
-                                "enabled\ninterpreter /usr/bin/wine\n"
-                                "magic 4d5a\n")
-            self.assertTrue(binfmt_registered(d))
-
-    def test_disabled_entry(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            _write_binfmt_entry(d, "DOSWin",
-                                "disabled\ninterpreter /usr/bin/wine\nmagic MZ\n")
-            self.assertFalse(binfmt_registered(d))
-
-    def test_no_entries(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            _write_binfmt_entry(d, "register", "")
-            _write_binfmt_entry(d, "status", "")
-            self.assertFalse(binfmt_registered(d))
-
-    def test_missing_dir(self):
-        self.assertFalse(binfmt_registered("/nonexistent/binfmt"))
 
 
 class TestBuildBin(unittest.TestCase):

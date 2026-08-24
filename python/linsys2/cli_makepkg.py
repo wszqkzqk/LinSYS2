@@ -145,50 +145,6 @@ def ensure_build_bin(env_name):
     _write_if_changed(build_bin / "cygpath", CYGPATH_SHIM_FILE.read_text())
 
 
-def binfmt_registered(binfmt_dir=None):
-    """Check whether binfmt_misc has an enabled registration for PE
-    (MZ) binaries."""
-    binfmt = Path(binfmt_dir) if binfmt_dir else Path("/proc/sys/fs/binfmt_misc")
-    if not binfmt.is_dir():
-        return False
-    try:
-        for entry in binfmt.iterdir():
-            if entry.name in ("register", "status"):
-                continue
-            try:
-                content = entry.read_text()
-            except OSError:
-                continue
-            if "enabled" not in content.splitlines():
-                continue
-            for line in content.splitlines():
-                # magic may be a literal "MZ" or its hex form "4d5a"
-                if line.startswith("magic") and (
-                        "MZ" in line or "4d5a" in line.lower()):
-                    return True
-    except OSError:
-        pass
-    return False
-
-
-def check_binfmt():
-    """binfmt_misc with an MZ->wine registration is required: build systems
-    execute freshly compiled PE test programs directly through it."""
-    if binfmt_registered():
-        return True
-    wine = shutil.which("wine") or "/usr/bin/wine"
-    error("binfmt_misc has no enabled PE (MZ) registration.")
-    error("linsys2-makepkg runs Windows tools natively through the kernel's")
-    error("binfmt_misc. Register Wine one time (requires root):")
-    print(f"""
-    sudo tee /etc/binfmt.d/linsys2-wine.conf <<'EOF'
-    :DOSWin:M::MZ::{wine}:F
-    EOF
-    sudo systemctl restart systemd-binfmt
-""")
-    return False
-
-
 def check_bwrap():
     """bubblewrap provides the private mount namespace that maps the
     environment's install prefix (/ucrt64, ...) into the build."""
@@ -251,8 +207,6 @@ def run_makepkg(env_name, makepkg_args):
     if not env_conf.exists():
         error(f"Environment {env_name} not initialized.")
         error(f"Run: linsys2-pacman init --env {env_name}")
-        return 1
-    if not check_binfmt():
         return 1
     if not check_bwrap():
         return 1
