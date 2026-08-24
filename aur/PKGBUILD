@@ -43,4 +43,6 @@ build() {
 package() {
     cd "${pkgname}"
     DESTDIR="${pkgdir}" meson install -C build
+    python -m compileall -q -o 0 -o 1 --invalidation-mode checked-hash \
+        -s "${pkgdir}" -p / "${pkgdir}"/usr/lib/linsys2
 }
