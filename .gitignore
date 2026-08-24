@@ -7,6 +7,7 @@ build/
 
 # Arch Linux makepkg directories
 /pkg/
+/src/
 
 # Meson subproject lock
 subprojects/.wraplock
