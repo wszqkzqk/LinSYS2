@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,7 +40,7 @@ class TestBuildBin(unittest.TestCase):
             self.assertTrue(os.access(build_bin / "gcc", os.X_OK))
             self.assertIn("exec wine cmd /c", (build_bin / "foo").read_text())
             self.assertFalse((build_bin / "ar").exists())
-            for shim in ("pacman", "pacman-conf", "cygpath"):
+            for shim in ("pacman", "pacman-conf", "cygpath", "uname"):
                 self.assertTrue((build_bin / shim).exists())
 
     def test_shim_names_win_over_exe(self):
@@ -65,7 +66,19 @@ class TestBuildBin(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
             self.assertEqual(sorted(p.name for p in build_bin.iterdir()),
-                             ["cygpath", "pacman", "pacman-conf"])
+                             ["cygpath", "pacman", "pacman-conf", "uname"])
+
+    def test_uname_shim_reports_msys2(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = subprocess.run([str(build_bin / "uname"), "-s"],
+                                 capture_output=True, text=True,
+                                 check=True).stdout.strip()
+            self.assertEqual(out, "MINGW64_NT-10.0-26100")
+            out = subprocess.run([str(build_bin / "uname"), "-m"],
+                                 capture_output=True, text=True,
+                                 check=True).stdout.strip()
+            self.assertEqual(out, "x86_64")
 
 
 class TestBwrapArgv(unittest.TestCase):
