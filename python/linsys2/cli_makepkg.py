@@ -17,6 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import functools
 import os
 import shutil
 import subprocess
@@ -146,14 +147,27 @@ def ensure_build_bin(env_name):
 
 
 def check_bwrap():
-    """bubblewrap provides the private mount namespace that maps the
-    environment's install prefix (/ucrt64, ...) into the build."""
     if shutil.which("bwrap"):
         return True
     error("bubblewrap (bwrap) not found.")
     error("linsys2-makepkg uses it to give the build a private filesystem")
     error("view with the environment prefix at /ucrt64. Install bubblewrap.")
     return False
+
+
+@functools.lru_cache(maxsize=1)
+def _can_mount_fresh_proc():
+    """Containers masking /proc submounts (systemd-nspawn, ...) make the
+    kernel reject a fresh procfs mount with EPERM; then bind the existing
+    /proc instead."""
+    try:
+        return subprocess.run(
+            ["bwrap", "--unshare-user", "--unshare-pid", "--die-with-parent",
+             "--dev-bind", "/", "/", "--proc", "/proc", "true"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False).returncode == 0
+    except OSError:
+        return False
 
 
 def build_bwrap_argv(env_name, makepkg_cmd):
@@ -167,6 +181,7 @@ def build_bwrap_argv(env_name, makepkg_cmd):
     env_prefix = get_env_dir(env_name) / install_prefix.lstrip("/")
 
     argv = ["bwrap", "--unshare-user", "--unshare-pid", "--die-with-parent"]
+    fresh_proc = _can_mount_fresh_proc()
     for top in sorted(os.listdir("/")):
         src = "/" + top
         if not os.path.isdir(src):
@@ -176,7 +191,7 @@ def build_bwrap_argv(env_name, makepkg_cmd):
         if os.path.islink(src):
             argv += ["--symlink", os.readlink(src), src]
         elif top == "proc":
-            argv += ["--proc", "/proc"]
+            argv += ["--proc", "/proc"] if fresh_proc else ["--bind", src, src]
         elif top == "dev":
             argv += ["--dev", "/dev", "--tmpfs", "/dev/shm"]
         elif top in ("sys", "boot", "efi"):

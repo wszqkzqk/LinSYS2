@@ -70,7 +70,9 @@ class TestBuildBin(unittest.TestCase):
 
 class TestBwrapArgv(unittest.TestCase):
     def test_prefix_mount(self):
-        argv = build_bwrap_argv("ucrt64", ["makepkg", "-s"])
+        with mock.patch("linsys2.cli_makepkg._can_mount_fresh_proc",
+                        return_value=True):
+            argv = build_bwrap_argv("ucrt64", ["makepkg", "-s"])
         self.assertEqual(argv[0], "bwrap")
         env_prefix = str(common.DATA_DIR / "ucrt64" / "ucrt64")
         i = argv.index(env_prefix)
@@ -81,8 +83,21 @@ class TestBwrapArgv(unittest.TestCase):
             if a == "--bind" and argv[j + 1] == "/ucrt64" \
                     and argv[j + 2] == "/ucrt64":
                 self.fail("host /ucrt64 leaked into namespace")
+        self.assertIn("--proc", argv)
         self.assertIn("makepkg", argv[-2:])
         self.assertEqual(argv[-1], "-s")
+
+    def test_proc_bind_fallback(self):
+        with mock.patch("linsys2.cli_makepkg._can_mount_fresh_proc",
+                        return_value=False):
+            argv = build_bwrap_argv("ucrt64", ["makepkg"])
+        self.assertNotIn("--proc", argv)
+        for j, a in enumerate(argv[:-2]):
+            if a == "--bind" and argv[j + 1] == "/proc" \
+                    and argv[j + 2] == "/proc":
+                break
+        else:
+            self.fail("/proc not bound in fallback mode")
 
 
 if __name__ == "__main__":
