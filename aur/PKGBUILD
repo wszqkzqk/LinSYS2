@@ -40,6 +40,11 @@ build() {
     meson compile -C build
 }
 
+check() {
+    cd "${pkgname}"
+    meson test -C build unit
+}
+
 package() {
     cd "${pkgname}"
     DESTDIR="${pkgdir}" meson install -C build
