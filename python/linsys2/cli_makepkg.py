@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from linsys2 import __version__
+from linsys2.cli_pacman import cmd_init as init_pacman_env
 from linsys2.common import (
     BIN_DIR,
     CONFIG_DIR,
@@ -41,6 +42,7 @@ from linsys2.common import (
     get_env_dir,
     get_wineprefix,
     info,
+    resolve_wineprefix,
     warn,
 )
 
@@ -67,9 +69,7 @@ def _write_if_changed(path, content, mode=0o755):
     path.chmod(mode)
 
 
-def ensure_wineprefix(env_name):
-    wineprefix = get_wineprefix(env_name)
-
+def ensure_wineprefix(wineprefix):
     if not (wineprefix / "dosdevices").is_dir():
         info(f"Initializing Wine prefix: {wineprefix}")
         wineprefix.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def ensure_wineprefix(env_name):
             warn("wineboot failed; prefix may be incomplete")
 
 
-def ensure_build_bin(env_name):
+def ensure_build_bin(env_name, wineprefix=None):
     """Generate the build shim directory (exclusively ours): pacman/
     pacman-conf/cygpath shims and a wrapper script for every foo.exe and
     .bat/.cmd tool in the environment's bin dir, so shell lookups like
@@ -95,7 +95,7 @@ def ensure_build_bin(env_name):
     build_bin = get_build_bin_dir(env_name)
     build_bin.mkdir(parents=True, exist_ok=True)
 
-    wineprefix = get_wineprefix(env_name)
+    wineprefix = wineprefix or get_wineprefix(env_name)
     bin_dir = get_bin_dir(env_name)
 
     exports = (
@@ -258,7 +258,7 @@ def acquire_env_lock(env_name):
     return fd
 
 
-def run_makepkg(env_name, makepkg_args):
+def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
     env_cfg = ENVIRONMENTS[env_name]
     env_conf = CONFIG_DIR / f"{env_name}.conf"
 
@@ -269,9 +269,10 @@ def run_makepkg(env_name, makepkg_args):
         error(f"makepkg config not found: {MAKEPKG_CONF}")
         return 1
     if not env_conf.exists():
-        error(f"Environment {env_name} not initialized.")
-        error(f"Run: linsys2-pacman init --env {env_name}")
-        return 1
+        info(f"Environment {env_name} not initialized, running init...")
+        if init_pacman_env(argparse.Namespace(env=env_name, force=False)) != 0:
+            error(f"Failed to initialize environment {env_name}")
+            return 1
     if not check_bwrap():
         return 1
 
@@ -280,15 +281,16 @@ def run_makepkg(env_name, makepkg_args):
         error(f"environment '{env_name}' is in use by another linsys2-makepkg")
         return 1
 
-    ensure_wineprefix(env_name)
-    ensure_build_bin(env_name)
+    wineprefix = resolve_wineprefix(env_name, wineprefix_arg)
+    ensure_wineprefix(wineprefix)
+    ensure_build_bin(env_name, wineprefix)
 
     env = os.environ.copy()
     env["MSYSTEM"] = env_cfg["msystem"]
     env["CHERE_INVOKING"] = "1"
     env["MSYS2_PACMAN_LINUX"] = "1"
     env["LINSYS2_ENV"] = env_name
-    env["WINEPREFIX"] = str(get_wineprefix(env_name))
+    env["WINEPREFIX"] = str(wineprefix)
     env["WINEPATH"] = winepath_of_bin_dir(env_name)
     env["WINEDEBUG"] = "-all"
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
@@ -336,6 +338,9 @@ def main():
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--env", default=None, choices=env_choices,
                      help=f"target environment (default: {DEFAULT_ENV})")
+    pre.add_argument("--prefix", default=None, metavar="WINEPREFIX",
+                     help="build inside this existing Wine prefix "
+                          "(default: the environment's managed prefix)")
     pre.add_argument("-h", "--help", action="store_true",
                      help="show this help message and exit")
     pre_args, makepkg_args = pre.parse_known_args(argv)
@@ -371,7 +376,7 @@ environments to build for, like MSYS2's makepkg-mingw.
     for env_name in envs:
         if len(envs) > 1:
             info(f"Building for {env_name}...")
-        rc = run_makepkg(env_name, makepkg_args)
+        rc = run_makepkg(env_name, makepkg_args, pre_args.prefix)
         if rc != 0:
             ret = rc
             break

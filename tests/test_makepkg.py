@@ -69,6 +69,15 @@ class TestBuildBin(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in build_bin.iterdir()),
                              ["cygpath", "pacman", "pacman-conf", "uname"])
 
+    def test_custom_wineprefix_baked_into_wrappers(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "gcc.exe").touch()
+            with mock.patch.object(common, "DATA_DIR", Path(td)):
+                ensure_build_bin("ucrt64", Path("/wp-custom"))
+            gcc = (Path(td) / "ucrt64" / "build-bin" / "gcc").read_text()
+            self.assertIn("export WINEPREFIX='/wp-custom'", gcc)
+
     def test_uname_shim_reports_msys2(self):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)

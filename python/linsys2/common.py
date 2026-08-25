@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os
 import platform
 import sys
 from pathlib import Path
@@ -95,3 +96,30 @@ def get_bin_dir(env_name):
 
 def get_wineprefix(env_name):
     return get_env_dir(env_name) / "wine"
+
+
+def resolve_wineprefix(env_name, prefix_arg=None, prefer_user=False):
+    """Resolve the Wine prefix for an environment: explicit argument,
+    optionally the user's own prefix, then a user-created wine.config
+    override, then the project-managed default."""
+    if prefix_arg:
+        return Path(prefix_arg)
+
+    if prefer_user:
+        user_wineprefix = os.environ.get("WINEPREFIX")
+        if user_wineprefix:
+            return Path(user_wineprefix)
+        default_wine = Path.home() / ".wine"
+        if default_wine.exists():
+            return default_wine
+
+    config_file = get_env_dir(env_name) / "wine.config"
+    if config_file.exists():
+        with open(config_file) as f:
+            for line in f:
+                if line.startswith("WINEPREFIX="):
+                    parts = line.strip().split("=", 1)
+                    if len(parts) == 2 and parts[1]:
+                        return Path(parts[1])
+
+    return get_wineprefix(env_name)

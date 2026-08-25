@@ -29,9 +29,8 @@ from linsys2.common import (
     ENVIRONMENTS,
     error,
     get_bin_dir,
-    get_env_dir,
-    get_wineprefix,
     info,
+    resolve_wineprefix,
     warn,
 )
 
@@ -168,7 +167,7 @@ def _delete_pango_backend(wineprefix):
 
 def cmd_init(args):
     env_name = args.env
-    wineprefix = Path(args.prefix) if args.prefix else get_wineprefix(env_name)
+    wineprefix = resolve_wineprefix(env_name, args.prefix)
 
     info(f"Initializing Wine integration for {env_name}...")
     info(f"WINEPREFIX: {wineprefix}")
@@ -185,10 +184,6 @@ def cmd_init(args):
     result = subprocess.run(["wineboot", "--init"], env=env, check=False)
     if result.returncode != 0:
         warn("wineboot failed; prefix may be incomplete")
-
-    config_file = get_env_dir(env_name) / "wine.config"
-    with open(config_file, "w") as f:
-        f.write(f"WINEPREFIX={wineprefix}\n")
 
     info("Configuring font backend...")
     try:
@@ -216,7 +211,7 @@ def cmd_register(args):
     """Register the bin directory to the user's existing Wine prefix
     ($WINEPREFIX or ~/.wine), not the project-managed one."""
     env_name = args.env
-    wineprefix = _get_wineprefix(env_name, args.prefix, prefer_user=True)
+    wineprefix = resolve_wineprefix(env_name, args.prefix, prefer_user=True)
     bin_dir = get_bin_dir(env_name)
 
     if not bin_dir.exists():
@@ -251,7 +246,7 @@ def cmd_register(args):
 def cmd_unregister(args):
     """Remove the bin directory from the user's existing Wine prefix."""
     env_name = args.env
-    wineprefix = _get_wineprefix(env_name, args.prefix, prefer_user=True)
+    wineprefix = resolve_wineprefix(env_name, args.prefix, prefer_user=True)
     bin_dir = get_bin_dir(env_name)
 
     ensure_wine()
@@ -309,7 +304,7 @@ def cmd_unregister(args):
 
 def cmd_env(args):
     env_name = args.env
-    wineprefix = _get_wineprefix(env_name, args.prefix, prefer_user=True)
+    wineprefix = resolve_wineprefix(env_name, args.prefix, prefer_user=True)
     bin_dir = get_bin_dir(env_name)
 
     print(f"Environment: {env_name}")
@@ -352,7 +347,7 @@ def cmd_env(args):
 
 def cmd_run(args):
     env_name = args.env
-    wineprefix = _get_wineprefix(env_name, args.prefix)
+    wineprefix = resolve_wineprefix(env_name, args.prefix)
     bin_dir = get_bin_dir(env_name)
 
     program = args.program
@@ -414,7 +409,7 @@ def cmd_run(args):
 
 def cmd_shell(args):
     env_name = args.env
-    wineprefix = _get_wineprefix(env_name, args.prefix)
+    wineprefix = resolve_wineprefix(env_name, args.prefix)
     bin_dir = get_bin_dir(env_name)
 
     if not wineprefix.exists():
@@ -453,32 +448,6 @@ def cmd_shell(args):
     info(f"Type 'exit' to leave")
 
     return subprocess.run([shell], env=env).returncode
-
-
-def _get_wineprefix(env_name, prefix_arg=None, prefer_user=False):
-    """prefer_user: prefer $WINEPREFIX or ~/.wine over the project-managed
-    prefix."""
-    if prefix_arg:
-        return Path(prefix_arg)
-
-    if prefer_user:
-        user_wineprefix = os.environ.get("WINEPREFIX")
-        if user_wineprefix:
-            return Path(user_wineprefix)
-        default_wine = Path.home() / ".wine"
-        if default_wine.exists():
-            return default_wine
-
-    config_file = get_env_dir(env_name) / "wine.config"
-    if config_file.exists():
-        with open(config_file) as f:
-            for line in f:
-                if line.startswith("WINEPREFIX="):
-                    parts = line.strip().split("=", 1)
-                    if len(parts) == 2 and parts[1]:
-                        return Path(parts[1])
-
-    return get_wineprefix(env_name)
 
 
 def main():
