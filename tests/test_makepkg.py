@@ -11,6 +11,7 @@ from linsys2.cli_makepkg import (
     acquire_env_lock,
     build_bwrap_argv,
     ensure_build_bin,
+    pacman_auth,
 )
 
 
@@ -89,6 +90,45 @@ class TestBuildBin(unittest.TestCase):
                                  capture_output=True, text=True,
                                  check=True).stdout.strip()
             self.assertEqual(out, "x86_64")
+
+
+class TestPacmanAuth(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        td = Path(self._td.name)
+        bin_dir = td / "ucrt64" / "ucrt64" / "bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "gcc.exe").touch()
+        self.build_bin = td / "ucrt64" / "build-bin"
+        self._env = mock.patch.dict(os.environ, {
+            "LINSYS2_ENV": "ucrt64",
+            "WINEPREFIX": str(td / "ucrt64" / "wine"),
+        })
+        self._env.start()
+        self._data = mock.patch.object(common, "DATA_DIR", td)
+        self._data.start()
+
+    def tearDown(self):
+        self._data.stop()
+        self._env.stop()
+        self._td.cleanup()
+
+    def test_success_refreshes_wrappers(self):
+        self.assertEqual(pacman_auth(["true"]), 0)
+        self.assertIn(f"export WINEPREFIX='{self._td.name}/ucrt64/wine'",
+                      (self.build_bin / "gcc").read_text())
+
+    def test_failure_no_refresh(self):
+        self.assertEqual(pacman_auth(["sh", "-c", "exit 3"]), 3)
+        self.assertFalse(self.build_bin.exists())
+
+    def test_signal_maps_to_128_plus_n(self):
+        self.assertEqual(pacman_auth(["sh", "-c", "kill -INT $$"]), 130)
+
+    def test_missing_linsys2_env_still_runs_command(self):
+        os.environ.pop("LINSYS2_ENV")
+        self.assertEqual(pacman_auth(["true"]), 0)
+        self.assertFalse(self.build_bin.exists())
 
 
 class TestEnvLock(unittest.TestCase):

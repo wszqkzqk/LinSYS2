@@ -258,6 +258,35 @@ def acquire_env_lock(env_name):
     return fd
 
 
+def pacman_auth(cmd_argv):
+    """PACMAN_AUTH hook: run makepkg's pacman command, refreshing the
+    build wrappers after a successful transaction."""
+    if not cmd_argv:
+        error("pacman-auth: no command given")
+        return 1
+    try:
+        rc = subprocess.call(cmd_argv)
+    except OSError as e:
+        error(f"pacman-auth: {e}")
+        return 127
+    except KeyboardInterrupt:
+        return 130
+    # shell convention: killed by signal N -> 128+N
+    if rc < 0:
+        rc = 128 - rc
+    if rc == 0:
+        env_name = os.environ.get("LINSYS2_ENV")
+        if env_name in ENVIRONMENTS:
+            wp = os.environ.get("WINEPREFIX")
+            try:
+                ensure_build_bin(env_name, Path(wp) if wp else None)
+            except Exception as e:
+                warn(f"failed to refresh build wrappers: {e}")
+        else:
+            warn("pacman-auth: LINSYS2_ENV unset, skipping wrapper refresh")
+    return rc
+
+
 def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
     env_cfg = ENVIRONMENTS[env_name]
     env_conf = CONFIG_DIR / f"{env_name}.conf"
@@ -332,6 +361,9 @@ def main():
     if argv and argv[0] in ("-V", "--version"):
         print(f"linsys2-makepkg {__version__}")
         return 0
+
+    if argv[:1] == ["--pacman-auth"]:
+        return pacman_auth(argv[1:])
 
     env_choices = list(ENVIRONMENTS.keys())
 
