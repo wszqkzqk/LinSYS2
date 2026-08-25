@@ -21,6 +21,16 @@ def to_windows(path, mixed=False):
         win = path
     return win.replace("\\", "/") if mixed else win.replace("/", "\\")
 
+def split_list(pathlist):
+    # A colon right after a lone drive letter is not a list separator.
+    parts = []
+    for fragment in pathlist.split(":"):
+        if parts and len(parts[-1]) == 1 and parts[-1].isalpha():
+            parts[-1] += ":" + fragment
+        else:
+            parts.append(fragment)
+    return parts
+
 def main():
     mode = "unix"
     absolute = False
@@ -69,7 +79,7 @@ def main():
             if mode == "unix":
                 print(":".join(convert(e) for e in p.split(";") if e))
             else:
-                print(";".join(convert(e) for e in p.split(":") if e))
+                print(";".join(convert(e) for e in split_list(p) if e))
         else:
             print(convert(p))
 

@@ -38,6 +38,10 @@ class TestCygpath(unittest.TestCase):
         r = run("-w", "-p", "/a:/b")
         self.assertEqual(r.stdout.strip(), "Z:\\a;Z:\\b")
 
+    def test_path_list_keeps_drive_letters(self):
+        r = run("-w", "-p", "Z:/a/lib:/ucrt64/lib")
+        self.assertEqual(r.stdout.strip(), "Z:\\a\\lib;Z:\\ucrt64\\lib")
+
     def test_help_and_version(self):
         self.assertEqual(run("--help").returncode, 0)
         self.assertEqual(run("--version").returncode, 0)

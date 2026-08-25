@@ -143,7 +143,12 @@ def ensure_build_bin(env_name):
         f"#!/bin/sh\n{WRAPPER_MARKER}\n"
         f"exec '{PACMAN_CONF_BIN}' --config '{env_conf}' \"$@\"\n",
     )
-    _write_if_changed(build_bin / "cygpath", CYGPATH_SHIM_FILE.read_text())
+    # Absolute interpreter, like the installed entry points: with the
+    # environment's Windows python3 wrapper first on PATH, /usr/bin/env
+    # python3 would run this shim under Windows Python (CRLF output).
+    cygpath_shim = CYGPATH_SHIM_FILE.read_text().replace(
+        "#!/usr/bin/env python3", f"#!{sys.executable}", 1)
+    _write_if_changed(build_bin / "cygpath", cygpath_shim)
 
     machine = ENVIRONMENTS[env_name]["chost"].partition("-")[0]
     _write_if_changed(
