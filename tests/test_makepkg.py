@@ -8,6 +8,7 @@ from unittest import mock
 import linsys2.common as common
 from linsys2.cli_makepkg import (
     WRAPPER_MARKER,
+    acquire_env_lock,
     build_bwrap_argv,
     ensure_build_bin,
 )
@@ -79,6 +80,22 @@ class TestBuildBin(unittest.TestCase):
                                  capture_output=True, text=True,
                                  check=True).stdout.strip()
             self.assertEqual(out, "x86_64")
+
+
+class TestEnvLock(unittest.TestCase):
+    def test_lock_excludes_second_build(self):
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch.object(common, "DATA_DIR", Path(td)):
+                fd = acquire_env_lock("ucrt64")
+                self.assertIsNotNone(fd)
+                self.assertIsNone(acquire_env_lock("ucrt64"))
+                other = acquire_env_lock("clang64")
+                self.assertIsNotNone(other)
+                os.close(other)
+                os.close(fd)
+                fd2 = acquire_env_lock("ucrt64")
+                self.assertIsNotNone(fd2)
+                os.close(fd2)
 
 
 class TestBwrapArgv(unittest.TestCase):

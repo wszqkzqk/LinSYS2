@@ -17,6 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import fcntl
 import functools
 import os
 import shutil
@@ -243,6 +244,20 @@ def build_bwrap_argv(env_name, makepkg_cmd):
     return argv
 
 
+def acquire_env_lock(env_name):
+    """Take the per-environment build lock; concurrent builds share the
+    WINEPREFIX and would kill each other's wineserver on entry and exit."""
+    env_dir = get_env_dir(env_name)
+    env_dir.mkdir(parents=True, exist_ok=True)
+    fd = os.open(env_dir / ".makepkg.lock", os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    return fd
+
+
 def run_makepkg(env_name, makepkg_args):
     env_cfg = ENVIRONMENTS[env_name]
     env_conf = CONFIG_DIR / f"{env_name}.conf"
@@ -258,6 +273,11 @@ def run_makepkg(env_name, makepkg_args):
         error(f"Run: linsys2-pacman init --env {env_name}")
         return 1
     if not check_bwrap():
+        return 1
+
+    lock_fd = acquire_env_lock(env_name)
+    if lock_fd is None:
+        error(f"environment '{env_name}' is in use by another linsys2-makepkg")
         return 1
 
     ensure_wineprefix(env_name)
@@ -298,7 +318,10 @@ def run_makepkg(env_name, makepkg_args):
                             env.get("PATH", "")])
 
     cmd = [str(MAKEPKG_BIN), "--config", str(MAKEPKG_CONF)] + makepkg_args
-    return subprocess.run(build_bwrap_argv(env_name, cmd), env=env).returncode
+    try:
+        return subprocess.run(build_bwrap_argv(env_name, cmd), env=env).returncode
+    finally:
+        os.close(lock_fd)
 
 
 def main():
