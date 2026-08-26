@@ -210,8 +210,9 @@ linsys2-makepkg --env clang64 -s
 # Build for several environments in one go (like makepkg-mingw)
 MINGW_ARCH="ucrt64 clang64" linsys2-makepkg -s
 
-# Install the result
+# Install the result into the matching environment
 linsys2-pacman -U mingw-w64-ucrt-x86_64-zlib-*-any.pkg.tar.zst
+linsys2-pacman --env clang64 -U mingw-w64-clang-x86_64-zlib-*-any.pkg.tar.zst
 ```
 
 All state stays inside `~/.local/share/linsys2/<env>/`; builds only write to the PKGBUILD directory (`src/`, `pkg/`, `*.pkg.tar.zst`), following makepkg conventions.
