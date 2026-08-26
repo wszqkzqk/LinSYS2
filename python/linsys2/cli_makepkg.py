@@ -131,7 +131,7 @@ def ensure_build_bin(env_name, wineprefix=None):
         try:
             if WRAPPER_MARKER in stale.read_text():
                 stale.unlink()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             pass
 
     env_conf = CONFIG_DIR / f"{env_name}.conf"

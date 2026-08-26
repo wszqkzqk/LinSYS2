@@ -65,6 +65,17 @@ class TestBuildBin(unittest.TestCase):
             self.assertFalse((build_bin / "gcc").exists())
             self.assertTrue((build_bin / "keep").exists())
 
+    def test_prune_ignores_non_utf8_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "gcc.exe").touch()
+            build_bin = self._run(td)
+            blob = build_bin / "blob"
+            blob.write_bytes(b"\xff\xfe\x00\x01")
+            self._run(td)
+            self.assertTrue(blob.exists())
+            self.assertTrue((build_bin / "gcc").exists())
+
     def test_missing_bin_dir_only_shims(self):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
