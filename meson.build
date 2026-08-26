@@ -11,6 +11,14 @@ system_prefix = get_option('system_prefix')
 # Patch the vendored pacman before meson reads it.
 run_command(find_program('scripts/apply-patches.sh'), check : true)
 
+# Reconfigure when a patch file changes so the script above re-runs.
+patch_list = run_command(
+  'sh', '-c', 'ls "@0@"/patches/*.patch'.format(meson.current_source_dir()),
+  check : true).stdout().split()
+foreach p : patch_list
+  configure_file(input : p, output : p.split('/')[-1], copy : true)
+endforeach
+
 # Force the subproject prefix so its own project() defaults cannot win.
 subproject('msys2-pacman', default_options : [
   'prefix=' + get_option('prefix'),

@@ -36,6 +36,6 @@ fi
 echo "[LinSYS2] Applying patches..."
 git -C "$sub" checkout -- .
 for p in "$top"/patches/*.patch; do
-    patch -p1 -d "$sub" -i "$p"
+    patch -p1 -d "$sub" --no-backup-if-mismatch -i "$p"
 done
 touch "$stamp"
