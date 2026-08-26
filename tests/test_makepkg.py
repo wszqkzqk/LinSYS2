@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -37,8 +38,8 @@ class TestBuildBin(unittest.TestCase):
 
             gcc = (build_bin / "gcc").read_text()
             self.assertIn(WRAPPER_MARKER, gcc)
-            self.assertIn(f"export WINEPREFIX='{td}/ucrt64/wine'", gcc)
-            self.assertIn(f"exec wine '{bin_dir}/gcc.exe' \"$@\"", gcc)
+            self.assertIn(f"export WINEPREFIX={shlex.quote(td + '/ucrt64/wine')}", gcc)
+            self.assertIn(f"exec wine {shlex.quote(str(bin_dir / 'gcc.exe'))} \"$@\"", gcc)
             self.assertTrue(os.access(build_bin / "gcc", os.X_OK))
             self.assertIn("exec wine cmd /c", (build_bin / "foo").read_text())
             self.assertFalse((build_bin / "ar").exists())
@@ -77,7 +78,21 @@ class TestBuildBin(unittest.TestCase):
             with mock.patch.object(common, "DATA_DIR", Path(td)):
                 ensure_build_bin("ucrt64", Path("/wp-custom"))
             gcc = (Path(td) / "ucrt64" / "build-bin" / "gcc").read_text()
-            self.assertIn("export WINEPREFIX='/wp-custom'", gcc)
+            self.assertIn(f"export WINEPREFIX={shlex.quote('/wp-custom')}", gcc)
+
+    def test_wrapper_with_quoted_paths(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "gcc.exe").touch()
+            wp = Path(td) / "o'brien"
+            with mock.patch.object(common, "DATA_DIR", Path(td)):
+                ensure_build_bin("ucrt64", wp)
+            gcc = Path(td) / "ucrt64" / "build-bin" / "gcc"
+            content = gcc.read_text()
+            self.assertIn(f"export WINEPREFIX={shlex.quote(str(wp))}", content)
+            self.assertIn(f"exec wine {shlex.quote(str(bin_dir / 'gcc.exe'))}",
+                          content)
+            subprocess.run(["sh", "-n", str(gcc)], check=True)
 
     def test_uname_shim_reports_msys2(self):
         with tempfile.TemporaryDirectory() as td:
@@ -115,8 +130,9 @@ class TestPacmanAuth(unittest.TestCase):
 
     def test_success_refreshes_wrappers(self):
         self.assertEqual(pacman_auth(["true"]), 0)
-        self.assertIn(f"export WINEPREFIX='{self._td.name}/ucrt64/wine'",
-                      (self.build_bin / "gcc").read_text())
+        self.assertIn(
+            f"export WINEPREFIX={shlex.quote(self._td.name + '/ucrt64/wine')}",
+            (self.build_bin / "gcc").read_text())
 
     def test_failure_no_refresh(self):
         self.assertEqual(pacman_auth(["sh", "-c", "exit 3"]), 3)

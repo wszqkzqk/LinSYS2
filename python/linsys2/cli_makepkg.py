@@ -20,6 +20,7 @@ import argparse
 import fcntl
 import functools
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -99,7 +100,7 @@ def ensure_build_bin(env_name, wineprefix=None):
     bin_dir = get_bin_dir(env_name)
 
     exports = (
-        f"export WINEPREFIX='{wineprefix}'\n"
+        f"export WINEPREFIX={shlex.quote(str(wineprefix))}\n"
         f"export WINEDEBUG=-all\n"
     )
 
@@ -110,10 +111,10 @@ def ensure_build_bin(env_name, wineprefix=None):
             lower = name.lower()
             if lower.endswith(".exe"):
                 wrapper = name[:-4]
-                invoke = f"exec wine '{entry}' \"$@\"\n"
+                invoke = f"exec wine {shlex.quote(str(entry))} \"$@\"\n"
             elif lower.endswith((".bat", ".cmd")):
                 wrapper = name.rsplit(".", 1)[0]
-                invoke = f"exec wine cmd /c '{entry}' \"$@\"\n"
+                invoke = f"exec wine cmd /c {shlex.quote(str(entry))} \"$@\"\n"
             else:
                 continue
             if not wrapper or wrapper in targets:
@@ -137,12 +138,12 @@ def ensure_build_bin(env_name, wineprefix=None):
     _write_if_changed(
         build_bin / "pacman",
         f"#!/bin/sh\n{WRAPPER_MARKER}\n"
-        f"exec '{BIN_DIR / 'linsys2-pacman'}' --env {env_name} \"$@\"\n",
+        f"exec {shlex.quote(str(BIN_DIR / 'linsys2-pacman'))} --env {env_name} \"$@\"\n",
     )
     _write_if_changed(
         build_bin / "pacman-conf",
         f"#!/bin/sh\n{WRAPPER_MARKER}\n"
-        f"exec '{PACMAN_CONF_BIN}' --config '{env_conf}' \"$@\"\n",
+        f"exec {shlex.quote(str(PACMAN_CONF_BIN))} --config {shlex.quote(str(env_conf))} \"$@\"\n",
     )
     # Absolute interpreter, like the installed entry points: with the
     # environment's Windows python3 wrapper first on PATH, /usr/bin/env
