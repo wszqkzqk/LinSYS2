@@ -18,6 +18,12 @@ if [ ! -f "$sub/meson.build" ]; then
     exit 1
 fi
 
+if [ ! -f "$top/vendor/msys2-keyring/msys2.gpg" ]; then
+    if [ -e "$top/.git" ]; then
+        git -C "$top" submodule update --init --recursive vendor/msys2-keyring
+    fi
+fi
+
 needs_patch=1
 if [ -f "$stamp" ]; then
     needs_patch=0
