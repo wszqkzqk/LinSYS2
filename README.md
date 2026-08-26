@@ -193,8 +193,8 @@ linsys2 unregister  # remove from Wine PATH
 It builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs directly on Linux, like MSYS2's `makepkg-mingw` but without Windows. The PKGBUILD shell logic runs natively; the Windows toolchain (GCC/Clang, CMake, ...) installed by `linsys2-pacman` runs through Wine:
 
 * `binfmt_misc` runs PE binaries through Wine transparently, so `foo.exe` is directly executable, including configure's freshly compiled test programs.
-* Bare names like `gcc` resolve through small wrapper scripts in a private shim directory (`build-bin/`) that exec the real `.exe` via Wine with the environment's `WINEPREFIX`. Because Wine is pointed at the real executable, its module path (DLL search order and self-located resources like GCC's specs and CMake's modules) is identical to running the `.exe` directly. The shim directory is exclusively ours: `linsys2-makepkg` regenerates it before each build and never writes into the package-managed bin directory.
-* The build runs inside a private `bubblewrap` mount namespace where the environment prefix is bind-mounted at its canonical location (`/ucrt64`, ...), so native processes and Wine processes (through the `Z:` drive) see the same absolute paths that msys-style build scripts hard-code.
+* Bare names like `gcc` resolve through small wrapper scripts in a private shim directory (`build-bin/`) that exec the real `.exe` via Wine with the environment's `WINEPREFIX`.
+* The build runs inside a private `bubblewrap` mount namespace where the environment prefix is bind-mounted at its canonical location (`/ucrt64`, ...).
 
 ```bash
 # Clone MINGW-packages and build a package
@@ -226,7 +226,7 @@ sudo systemctl restart systemd-binfmt
 
 In a container, register on the host; the `F` flag makes it work inside the container too.
 
-Known limitations: `check()` is disabled by default because test suites usually execute freshly built PE binaries through MSYS `exec` semantics that do not exist here (pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
+Known limitations: `check()` is disabled by default because test suites usually cannot run in this setup (pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
 
 ---
 
