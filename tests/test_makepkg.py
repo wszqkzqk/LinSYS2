@@ -174,6 +174,7 @@ class TestEnvLock(unittest.TestCase):
                 os.close(fd2)
 
 
+@unittest.skipUnless(os.path.isdir("/proc"), "requires a Linux /proc")
 class TestBwrapArgv(unittest.TestCase):
     def test_prefix_mount(self):
         with mock.patch("linsys2.cli_makepkg._can_mount_fresh_proc",
