@@ -206,11 +206,14 @@ def cmd_init(args):
     force = args.force
 
     env_dir = get_env_dir(env_name)
+    config_file = get_config_file(env_name)
+    db_dir = env_dir / "var" / "lib" / "pacman"
 
     info(f"Initializing {env_name} environment...")
 
-    if env_dir.exists() and any(env_dir.iterdir()):
-        warn(f"Environment directory already exists: {env_dir}")
+    # The env dir is shared with Wine/build tools; only pacman state counts.
+    if config_file.exists() or db_dir.exists():
+        warn(f"Pacman environment already initialized: {env_name}")
         if not force:
             try:
                 response = input("Reinitialize? [y/N] ")
@@ -224,7 +227,6 @@ def cmd_init(args):
 
     info("Initializing pacman keyring...")
     pacman_key = get_pacman_key_binary()
-    config_file = get_config_file(env_name)
     env = get_pacman_env()
 
     try:
