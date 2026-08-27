@@ -166,11 +166,13 @@ def run_pacman(env_name, pacman_args):
 
     if not config_file.exists() or not db_dir.exists():
         info(f"Environment {env_name} not initialized, running init...")
-        cmd_init(argparse.Namespace(env=env_name, force=False))
+        if cmd_init(argparse.Namespace(env=env_name, force=False)) != 0:
+            error("Initialization failed, aborting.")
+            return 1
 
     cmd = [pacman_bin, "--config", str(config_file)] + pacman_args
     env = get_pacman_env()
-    return subprocess.run(cmd, env=env)
+    return subprocess.run(cmd, env=env).returncode
 
 
 def show_help():
@@ -320,4 +322,4 @@ def main():
                 return 0
             return cmd_update_keyring(parsed)
 
-    return run_pacman(env_name, remaining).returncode
+    return run_pacman(env_name, remaining)
