@@ -93,13 +93,13 @@ makepkg -si
 Other distributions should install the equivalent packages under their own package names.
 
 * Build dependencies: `meson ninja-build gcc git patch pkg-config libarchive libssl libgpgme libcurl`
-* Runtime dependencies: `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bzip2 xz zstd wine python bubblewrap`
+* Runtime dependencies: `bash coreutils gawk grep gettext which curl gnupg openssl libarchive bsdtar bzip2 xz zstd wine python bubblewrap`
 
 On Debian/Ubuntu:
 
 ```bash
 sudo apt install meson ninja-build gcc git patch pkg-config \
-    libarchive-dev libssl-dev libgpgme-dev libcurl4-openssl-dev \
+    libarchive-dev libarchive-tools libssl-dev libgpgme-dev libcurl4-openssl-dev \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
 
@@ -226,7 +226,7 @@ sudo systemctl restart systemd-binfmt
 
 In a container, register on the host; the `F` flag makes it work inside the container too.
 
-Known limitations: `check()` is disabled by default because test suites usually cannot run in this setup (pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments.
+Known limitations: `check()` is disabled by default because test suites usually cannot run in this setup (pass `--check` to force it); `.bat`/`.cmd` build scripts run through `wine cmd`; packages with unusual Windows-only build steps may need per-package adjustments; a build kills all Windows processes running in the selected Wine prefix (it restarts the prefix's `wineserver` on entry and exit).
 
 ---
 
