@@ -1,31 +1,20 @@
-commit 0d37c1daa0990766d12d0060a353c829bf8616eb
-Author: Allan McRae <allan@archlinux.org>
-Date:   Sun May 4 20:52:20 2025 +1000
-
-    Initialise callback event fields
-    
-    While the event is already globally initialised, initialising the fields
-    prevents a valgrind warning (since the gcc-15 update).
-    
-    Signed-off-by: Allan McRae <allan@archlinux.org>
-
 diff --git a/lib/libalpm/dload.c b/lib/libalpm/dload.c
-index 782d15ee..24586dba 100644
+index f2fa1a54..f5edb86d 100644
 --- a/lib/libalpm/dload.c
 +++ b/lib/libalpm/dload.c
-@@ -1357,6 +1357,7 @@ int SYMEXPORT alpm_fetch_pkgurl(alpm_handle_t *handle, const alpm_list_t *urls,
+@@ -1139,6 +1139,7 @@ int SYMEXPORT alpm_fetch_pkgurl(alpm_handle_t *handle, const alpm_list_t *urls,
  	if(payloads) {
  		event.type = ALPM_EVENT_PKG_RETRIEVE_START;
  		event.pkg_retrieve.num = alpm_list_count(payloads);
 +		event.pkg_retrieve.total_size = 0;
  		EVENT(handle, &event);
- 		if(_alpm_download(handle, payloads, cachedir, temporary_cachedir) == -1) {
+ 		if(_alpm_download(handle, payloads, cachedir) == -1) {
  			_alpm_log(handle, ALPM_LOG_WARNING, _("failed to retrieve some files\n"));
 diff --git a/lib/libalpm/sync.c b/lib/libalpm/sync.c
-index 372d2b31..13cf1cef 100644
+index 294a4b93..d68df54e 100644
 --- a/lib/libalpm/sync.c
 +++ b/lib/libalpm/sync.c
-@@ -817,6 +817,8 @@ static int download_files(alpm_handle_t *handle)
+@@ -833,6 +833,8 @@ static int download_files(alpm_handle_t *handle)
  		}
  
  		event.type = ALPM_EVENT_PKG_RETRIEVE_START;
