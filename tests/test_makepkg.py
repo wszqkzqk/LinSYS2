@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import linsys2.cli_makepkg as cli_makepkg
 import linsys2.common as common
 from linsys2.cli_makepkg import (
     WRAPPER_MARKER,
@@ -205,6 +206,74 @@ class TestBwrapArgv(unittest.TestCase):
                 break
         else:
             self.fail("/proc not bound in fallback mode")
+
+
+class TestRunMakepkgGate(unittest.TestCase):
+    def test_errors_when_uninitialized(self):
+        """Mirror of the run_pacman gate: without an initialized
+        environment the build must not start."""
+        with tempfile.TemporaryDirectory() as td, \
+                mock.patch.object(cli_makepkg, "MAKEPKG_BIN",
+                                  Path(td) / "makepkg"), \
+                mock.patch.object(cli_makepkg, "MAKEPKG_CONF",
+                                  Path(td) / "makepkg.conf"), \
+                mock.patch.object(cli_makepkg, "CONFIG_DIR",
+                                  Path(td) / "config"), \
+                mock.patch.object(cli_makepkg, "check_bwrap") as bwrap_mock, \
+                mock.patch.object(cli_makepkg.subprocess, "run") as run_mock:
+            (Path(td) / "makepkg").touch()
+            (Path(td) / "makepkg.conf").touch()
+            rc = cli_makepkg.run_makepkg("ucrt64", ["-s"])
+        self.assertEqual(rc, 1)
+        bwrap_mock.assert_not_called()
+        run_mock.assert_not_called()
+
+    def test_runs_when_config_exists(self):
+        """Pairing for the gate test: with a config file present the gate
+        must let the build proceed (it then stops at the bwrap check)."""
+        with tempfile.TemporaryDirectory() as td, \
+                mock.patch.object(cli_makepkg, "MAKEPKG_BIN",
+                                  Path(td) / "makepkg"), \
+                mock.patch.object(cli_makepkg, "MAKEPKG_CONF",
+                                  Path(td) / "makepkg.conf"), \
+                mock.patch.object(cli_makepkg, "CONFIG_DIR",
+                                  Path(td) / "config"), \
+                mock.patch.object(cli_makepkg, "check_bwrap",
+                                  return_value=False) as bwrap_mock, \
+                mock.patch.object(cli_makepkg.subprocess, "run") as run_mock:
+            (Path(td) / "makepkg").touch()
+            (Path(td) / "makepkg.conf").touch()
+            config = Path(td) / "config" / "ucrt64.conf"
+            config.parent.mkdir(parents=True)
+            config.touch()
+            rc = cli_makepkg.run_makepkg("ucrt64", ["-s"])
+        self.assertEqual(rc, 1)  # bwrap missing, but the gate let us through
+        bwrap_mock.assert_called_once()
+        run_mock.assert_not_called()
+
+    def test_errors_when_wine_missing(self):
+        """Like check_bwrap, a missing wine fails loudly before the
+        build starts instead of crashing in wineboot."""
+        with tempfile.TemporaryDirectory() as td, \
+                mock.patch.object(cli_makepkg, "MAKEPKG_BIN",
+                                  Path(td) / "makepkg"), \
+                mock.patch.object(cli_makepkg, "MAKEPKG_CONF",
+                                  Path(td) / "makepkg.conf"), \
+                mock.patch.object(cli_makepkg, "CONFIG_DIR",
+                                  Path(td) / "config"), \
+                mock.patch.object(cli_makepkg.shutil, "which",
+                                  return_value=None), \
+                mock.patch.object(cli_makepkg, "check_bwrap",
+                                  return_value=True), \
+                mock.patch.object(cli_makepkg.subprocess, "run") as run_mock:
+            (Path(td) / "makepkg").touch()
+            (Path(td) / "makepkg.conf").touch()
+            config = Path(td) / "config" / "ucrt64.conf"
+            config.parent.mkdir(parents=True)
+            config.touch()
+            rc = cli_makepkg.run_makepkg("ucrt64", ["-s"])
+        self.assertEqual(rc, 1)
+        run_mock.assert_not_called()
 
 
 if __name__ == "__main__":

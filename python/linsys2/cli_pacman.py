@@ -104,12 +104,6 @@ def get_db_dir(env_name):
     return get_env_dir(env_name) / "var" / "lib" / "pacman"
 
 
-def is_initialized(env_name):
-    """Config and db dir are written before the keyring runs but removed
-    again when it fails, so their presence proves setup completed."""
-    return get_config_file(env_name).exists() and get_db_dir(env_name).exists()
-
-
 def create_mirrorlist():
     mirrorlist_file = CONFIG_DIR / "mirrorlist.mingw"
     if mirrorlist_file.exists():
@@ -172,12 +166,10 @@ def run_pacman(env_name, pacman_args):
     pacman_bin = get_pacman_binary()
     config_file = get_config_file(env_name)
 
-    if not is_initialized(env_name):
-        info(f"Environment {env_name} not initialized, running init...")
-        # Auto-repair must not prompt: in CI there is no one to answer.
-        if cmd_init(argparse.Namespace(env=env_name, force=True)) != 0:
-            error("Initialization failed, aborting.")
-            return 1
+    if not config_file.exists():
+        error(f"Environment not initialized: {env_name}")
+        error(f"Run: linsys2-pacman init --env {env_name}")
+        return 1
 
     cmd = [pacman_bin, "--config", str(config_file)] + pacman_args
     env = get_pacman_env()
@@ -220,8 +212,7 @@ def cmd_init(args):
     info(f"Initializing {env_name} environment...")
 
     # The env dir is shared with Wine/build tools; only pacman state counts.
-    fresh = not config_file.exists() and not db_dir.exists()
-    if not fresh:
+    if config_file.exists() or db_dir.exists():
         warn(f"Pacman environment already initialized: {env_name}")
         if not force:
             try:
@@ -243,18 +234,9 @@ def cmd_init(args):
                        env=env, check=True)
         subprocess.run([pacman_key, "--config", str(config_file), "--populate", "msys2"],
                        env=env, check=True)
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, OSError) as e:
         error(f"pacman-key initialization failed: {e}")
-        if fresh:
-            # Leave no trace of a failed setup: the config and db dir are
-            # the is_initialized() criterion, so if they stayed behind,
-            # later runs would treat this environment as initialized and
-            # never retry the keyring.
-            config_file.unlink(missing_ok=True)
-            try:
-                db_dir.rmdir()
-            except OSError:
-                pass
+        error(f"Run 'linsys2-pacman init --env {env_name} --force' to retry.")
         return 1
 
     info(f"Environment {env_name} initialized successfully")
