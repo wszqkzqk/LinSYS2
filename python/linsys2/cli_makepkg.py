@@ -28,6 +28,7 @@ from pathlib import Path
 
 from linsys2 import __version__
 from linsys2.cli_pacman import cmd_init as init_pacman_env
+from linsys2.cli_pacman import is_initialized
 from linsys2.common import (
     BIN_DIR,
     CONFIG_DIR,
@@ -290,7 +291,6 @@ def pacman_auth(cmd_argv):
 
 def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
     env_cfg = ENVIRONMENTS[env_name]
-    env_conf = CONFIG_DIR / f"{env_name}.conf"
 
     if not MAKEPKG_BIN.exists():
         error(f"makepkg not found: {MAKEPKG_BIN}")
@@ -298,9 +298,9 @@ def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
     if not MAKEPKG_CONF.exists():
         error(f"makepkg config not found: {MAKEPKG_CONF}")
         return 1
-    if not env_conf.exists():
+    if not is_initialized(env_name):
         info(f"Environment {env_name} not initialized, running init...")
-        if init_pacman_env(argparse.Namespace(env=env_name, force=False)) != 0:
+        if init_pacman_env(argparse.Namespace(env=env_name, force=True)) != 0:
             error(f"Failed to initialize environment {env_name}")
             return 1
     if not check_bwrap():

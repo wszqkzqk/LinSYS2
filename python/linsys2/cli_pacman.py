@@ -100,6 +100,16 @@ def get_config_file(env_name):
     return CONFIG_DIR / f"{env_name}.conf"
 
 
+def get_db_dir(env_name):
+    return get_env_dir(env_name) / "var" / "lib" / "pacman"
+
+
+def is_initialized(env_name):
+    """Config and db dir are written before the keyring runs but removed
+    again when it fails, so their presence proves setup completed."""
+    return get_config_file(env_name).exists() and get_db_dir(env_name).exists()
+
+
 def create_mirrorlist():
     mirrorlist_file = CONFIG_DIR / "mirrorlist.mingw"
     if mirrorlist_file.exists():
@@ -122,7 +132,7 @@ def create_config(env_name):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    (env_dir / "var" / "lib" / "pacman").mkdir(parents=True, exist_ok=True)
+    get_db_dir(env_name).mkdir(parents=True, exist_ok=True)
     (env_dir / "var" / "cache" / "pacman" / "pkg").mkdir(parents=True, exist_ok=True)
     (env_dir / "var" / "log").mkdir(parents=True, exist_ok=True)
     (env_dir / "etc" / "pacman.d" / "hooks").mkdir(parents=True, exist_ok=True)
@@ -161,12 +171,11 @@ Include = {CONFIG_DIR / "mirrorlist.mingw"}
 def run_pacman(env_name, pacman_args):
     pacman_bin = get_pacman_binary()
     config_file = get_config_file(env_name)
-    env_dir = get_env_dir(env_name)
-    db_dir = env_dir / "var" / "lib" / "pacman"
 
-    if not config_file.exists() or not db_dir.exists():
+    if not is_initialized(env_name):
         info(f"Environment {env_name} not initialized, running init...")
-        if cmd_init(argparse.Namespace(env=env_name, force=False)) != 0:
+        # Auto-repair must not prompt: in CI there is no one to answer.
+        if cmd_init(argparse.Namespace(env=env_name, force=True)) != 0:
             error("Initialization failed, aborting.")
             return 1
 
@@ -205,14 +214,14 @@ def cmd_init(args):
     env_name = args.env
     force = args.force
 
-    env_dir = get_env_dir(env_name)
     config_file = get_config_file(env_name)
-    db_dir = env_dir / "var" / "lib" / "pacman"
+    db_dir = get_db_dir(env_name)
 
     info(f"Initializing {env_name} environment...")
 
     # The env dir is shared with Wine/build tools; only pacman state counts.
-    if config_file.exists() or db_dir.exists():
+    fresh = not config_file.exists() and not db_dir.exists()
+    if not fresh:
         warn(f"Pacman environment already initialized: {env_name}")
         if not force:
             try:
@@ -223,12 +232,12 @@ def cmd_init(args):
                 info("Aborted")
                 return 1
 
-    create_config(env_name)
-
-    info("Initializing pacman keyring...")
     pacman_key = get_pacman_key_binary()
     env = get_pacman_env()
 
+    create_config(env_name)
+
+    info("Initializing pacman keyring...")
     try:
         subprocess.run([pacman_key, "--config", str(config_file), "--init"],
                        env=env, check=True)
@@ -236,6 +245,16 @@ def cmd_init(args):
                        env=env, check=True)
     except subprocess.CalledProcessError as e:
         error(f"pacman-key initialization failed: {e}")
+        if fresh:
+            # Leave no trace of a failed setup: the config and db dir are
+            # the is_initialized() criterion, so if they stayed behind,
+            # later runs would treat this environment as initialized and
+            # never retry the keyring.
+            config_file.unlink(missing_ok=True)
+            try:
+                db_dir.rmdir()
+            except OSError:
+                pass
         return 1
 
     info(f"Environment {env_name} initialized successfully")

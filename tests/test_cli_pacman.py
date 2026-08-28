@@ -124,5 +124,87 @@ class TestCmdInit(unittest.TestCase):
         input_mock.assert_not_called()
 
 
+class TestIsInitialized(unittest.TestCase):
+    def test_states(self):
+        with tempfile.TemporaryDirectory() as td, _patch_dirs(td):
+            config = Path(td) / "config" / "ucrt64.conf"
+            db = Path(td) / "data" / "ucrt64" / "var" / "lib" / "pacman"
+            self.assertFalse(cli_pacman.is_initialized("ucrt64"))
+            config.parent.mkdir(parents=True)
+            config.touch()
+            self.assertFalse(cli_pacman.is_initialized("ucrt64"))
+            db.mkdir(parents=True)
+            self.assertTrue(cli_pacman.is_initialized("ucrt64"))
+            config.unlink()
+            self.assertFalse(cli_pacman.is_initialized("ucrt64"))
+
+
+class TestInitRollback(unittest.TestCase):
+    def test_failed_fresh_init_leaves_no_trace(self):
+        """A failed first init must not look initialized, so later runs
+        retry the keyring instead of failing on signature errors."""
+        with tempfile.TemporaryDirectory() as td, \
+                _patch_dirs(td), \
+                mock.patch.object(cli_pacman, "get_pacman_key_binary",
+                                  return_value="/bin/true"), \
+                mock.patch.object(cli_pacman.subprocess, "run",
+                                  side_effect=subprocess.CalledProcessError(
+                                      1, ["pacman-key"])) as run_mock:
+            rc = cli_pacman.cmd_init(Namespace(env="ucrt64", force=True))
+            self.assertEqual(rc, 1)
+            self.assertFalse((Path(td) / "config" / "ucrt64.conf").exists())
+            self.assertFalse((Path(td) / "data" / "ucrt64"
+                              / "var" / "lib" / "pacman").exists())
+            # The retried init succeeds and the environment works.
+            run_mock.side_effect = None
+            run_mock.return_value = subprocess.CompletedProcess([], 0)
+            self.assertEqual(
+                cli_pacman.cmd_init(Namespace(env="ucrt64", force=True)), 0)
+            self.assertTrue(cli_pacman.is_initialized("ucrt64"))
+
+    def test_failed_reinit_keeps_existing_config(self):
+        """A failed re-init of an existing environment must not wipe the
+        state that was there before."""
+        with tempfile.TemporaryDirectory() as td, \
+                _patch_dirs(td), \
+                mock.patch.object(cli_pacman, "get_pacman_key_binary",
+                                  return_value="/bin/true"), \
+                mock.patch.object(cli_pacman.subprocess, "run",
+                                  side_effect=subprocess.CalledProcessError(
+                                      1, ["pacman-key"])):
+            config = Path(td) / "config" / "ucrt64.conf"
+            config.parent.mkdir(parents=True)
+            config.write_text("previous config")
+            (Path(td) / "data" / "ucrt64" / "var" / "lib" / "pacman"
+             ).mkdir(parents=True)
+            rc = cli_pacman.cmd_init(Namespace(env="ucrt64", force=True))
+            self.assertEqual(rc, 1)
+            self.assertTrue(config.exists())
+
+
+class TestAutoInitRepair(unittest.TestCase):
+    def test_auto_init_does_not_prompt(self):
+        """Auto-init repairs without asking; in CI there is no one to
+        answer a prompt. Uses a half-initialized environment (config
+        without db dir): the state where the code used to stop and ask
+        "Reinitialize?" even though it had decided to repair on its own."""
+        with tempfile.TemporaryDirectory() as td, \
+                _patch_dirs(td), \
+                mock.patch.object(cli_pacman, "get_pacman_binary",
+                                  return_value="/bin/true"), \
+                mock.patch.object(cli_pacman, "get_pacman_key_binary",
+                                  return_value="/bin/true"), \
+                mock.patch("builtins.input",
+                           side_effect=AssertionError("prompted")), \
+                mock.patch.object(cli_pacman.subprocess, "run",
+                                  return_value=subprocess.CompletedProcess(
+                                      [], returncode=0)):
+            config = Path(td) / "config" / "ucrt64.conf"
+            config.parent.mkdir(parents=True)
+            config.touch()
+            rc = cli_pacman.run_pacman("ucrt64", ["-Q"])
+        self.assertEqual(rc, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
