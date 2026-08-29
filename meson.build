@@ -64,7 +64,9 @@ install_data(
    'python/linsys2/cli_makepkg.py'],
   install_dir : py_pkg_dir)
 install_data([version_py, paths_py], install_dir : py_pkg_dir)
-install_data('python/linsys2/shims/cygpath', install_dir : py_pkg_dir / 'shims')
+install_data(['python/linsys2/shims/cygpath',
+              'python/linsys2/shims/uname'],
+             install_dir : py_pkg_dir / 'shims')
 
 # Entry points -> <system_prefix>/bin. Absolute shebang, not env: an MSYS2
 # environment's own Windows python3 can end up first on PATH.

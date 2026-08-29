@@ -106,17 +106,119 @@ class TestBuildBin(unittest.TestCase):
                           content)
             subprocess.run(["sh", "-n", str(gcc)], check=True)
 
+    def _uname(self, build_bin, *args, wine=None):
+        # Run the shim with PATH limited to a stub dir (+ stub wine if given).
+        with tempfile.TemporaryDirectory() as stub_dir:
+            env = os.environ.copy()
+            env["PATH"] = stub_dir
+            if wine is not None:
+                stub = Path(stub_dir) / "wine"
+                stub.write_text(f"#!/bin/sh\nprintf '%s\\n' '{wine}'\n"
+                                f"echo \"$WINEPREFIX\" > '{stub_dir}/wp'\n")
+                stub.chmod(0o755)
+            result = subprocess.run([str(build_bin / "uname"), *args],
+                                    capture_output=True, text=True, env=env)
+            wp = Path(stub_dir) / "wp"
+            result.wineprefix = wp.read_text().strip() if wp.exists() else None
+            return result
+
     def test_uname_shim_reports_msys2(self):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
-            out = subprocess.run([str(build_bin / "uname"), "-s"],
-                                 capture_output=True, text=True,
-                                 check=True).stdout.strip()
-            self.assertEqual(out, "MINGW64_NT-10.0-26100")
-            out = subprocess.run([str(build_bin / "uname"), "-m"],
-                                 capture_output=True, text=True,
-                                 check=True).stdout.strip()
-            self.assertEqual(out, "x86_64")
+            # No wine on PATH: the shim falls back to its default.
+            out = self._uname(build_bin, "-s")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+            out = self._uname(build_bin, "-m")
+            self.assertEqual(out.stdout.strip(), "x86_64")
+            out = self._uname(build_bin)
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+
+    def test_uname_shim_sysname_from_wine(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "-s",
+                              wine="Microsoft Windows 10.0.26300")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-26300")
+            self.assertEqual(out.wineprefix,
+                             str(Path(td) / "ucrt64" / "wine"))
+
+    def test_uname_shim_sysname_from_wine_win7(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "-s",
+                              wine="Microsoft Windows 6.1.7601")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-6.1-7601")
+
+    def test_uname_shim_sysname_fallback(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "-s", wine="garbage")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+
+    def test_uname_shim_combined_flags(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            # Combined short flags must not fall through to the host uname.
+            out = self._uname(build_bin, "-sm")
+            self.assertEqual(out.stdout.strip(),
+                             "MINGW64_NT-10.0-19043 x86_64")
+            out = self._uname(build_bin, "-srm")
+            self.assertEqual(out.stdout.strip(),
+                             "MINGW64_NT-10.0-19043 "
+                             "3.6.10-8fbd9808.x86_64 x86_64")
+            # Fixed output order, independent of option order/repetition.
+            out = self._uname(build_bin, "-ms")
+            self.assertEqual(out.stdout.strip(),
+                             "MINGW64_NT-10.0-19043 x86_64")
+            out = self._uname(build_bin, "-ss")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+
+    def test_uname_shim_all(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "-a")
+            self.assertEqual(
+                out.stdout.strip(),
+                f"MINGW64_NT-10.0-19043 {os.uname().nodename} "
+                "3.6.10-8fbd9808.x86_64 2026-08-13 11:15 UTC x86_64 Msys")
+            out = self._uname(build_bin, "-p")
+            self.assertEqual(out.stdout.strip(), "unknown")
+            out = self._uname(build_bin, "-pi")
+            self.assertEqual(out.stdout.strip(), "unknown unknown")
+
+    def test_uname_shim_long_options(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "--machine")
+            self.assertEqual(out.stdout.strip(), "x86_64")
+            out = self._uname(build_bin, "--kernel-name")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+            out = self._uname(build_bin, "--operating-system")
+            self.assertEqual(out.stdout.strip(), "Msys")
+            out = self._uname(build_bin, "--version")
+            self.assertEqual(out.returncode, 0)
+            self.assertTrue(out.stdout.startswith("uname (GNU coreutils)"))
+            out = self._uname(build_bin, "--help")
+            self.assertEqual(out.returncode, 0)
+
+    def test_uname_shim_rejects_bad_usage(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = self._uname(build_bin, "-x")
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("invalid option", out.stderr)
+            out = self._uname(build_bin, "--bogus")
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("unrecognized option", out.stderr)
+            # Not a GNU option; real MSYS2 uname rejects it too.
+            out = self._uname(build_bin, "--sysname")
+            self.assertNotEqual(out.returncode, 0)
+            out = self._uname(build_bin, "foo")
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("extra operand", out.stderr)
+            out = self._uname(build_bin, "--", "foo")
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("extra operand", out.stderr)
 
 
 class TestPacmanAuth(unittest.TestCase):
