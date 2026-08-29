@@ -14,6 +14,9 @@ LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem o
 ## Quick Start
 
 ```bash
+# One-time setup
+linsys2-pacman init
+
 # Install a Windows compiler
 linsys2-pacman -Sy mingw-w64-ucrt-x86_64-gcc
 
@@ -100,6 +103,7 @@ On Debian/Ubuntu:
 ```bash
 sudo apt install meson ninja-build gcc git patch pkg-config \
     libarchive-dev libarchive-tools libssl-dev libgpgme-dev libcurl4-openssl-dev \
+    bzip2 xz zstd curl \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
 
@@ -107,7 +111,8 @@ On Fedora:
 
 ```bash
 sudo dnf install meson ninja-build gcc git patch pkg-config \
-    libarchive-devel openssl-devel gpgme-devel libcurl-devel \
+    libarchive-devel bsdtar openssl-devel gpgme-devel libcurl-devel \
+    bzip2 xz zstd curl \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
 
@@ -129,6 +134,9 @@ sudo meson install -C build
 ### Package Management (`linsys2-pacman`)
 
 ```bash
+# One-time setup
+linsys2-pacman init
+
 # Sync databases and upgrade
 linsys2-pacman -Syu
 
@@ -200,6 +208,10 @@ It builds [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs di
 # Clone MINGW-packages and build a package
 git clone https://github.com/msys2/MINGW-packages.git
 cd MINGW-packages/mingw-w64-zlib
+
+# One-time setup of the environments you build for
+linsys2-pacman init
+linsys2-pacman init --env clang64
 
 # Build (installs mingw build dependencies into the environment with -s)
 linsys2-makepkg -s
