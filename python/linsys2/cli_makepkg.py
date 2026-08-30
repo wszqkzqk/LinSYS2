@@ -113,8 +113,10 @@ def ensure_build_bin(env_name, wineprefix=None):
                 wrapper = name[:-4]
                 invoke = f"exec wine {shlex.quote(str(entry))} \"$@\"\n"
             elif lower.endswith((".bat", ".cmd")):
-                wrapper = name.rsplit(".", 1)[0]
-                invoke = f"exec wine cmd /c {shlex.quote(str(entry))} \"$@\"\n"
+                # Bare names resolve to .exe on MSYS2; .bat/.cmd stay explicit.
+                wrapper = name
+                win_path = "Z:" + str(entry).replace("/", "\\")
+                invoke = f"exec wine cmd /c {shlex.quote(win_path)} \"$@\"\n"
             else:
                 continue
             if not wrapper or wrapper in targets:

@@ -42,10 +42,24 @@ class TestBuildBin(unittest.TestCase):
             self.assertIn(f"export WINEPREFIX={shlex.quote(td + '/ucrt64/wine')}", gcc)
             self.assertIn(f"exec wine {shlex.quote(str(bin_dir / 'gcc.exe'))} \"$@\"", gcc)
             self.assertTrue(os.access(build_bin / "gcc", os.X_OK))
-            self.assertIn("exec wine cmd /c", (build_bin / "foo").read_text())
+            bat = (build_bin / "foo.bat").read_text()
+            self.assertIn("exec wine cmd /c", bat)
+            self.assertIn("Z:\\", bat)
+            self.assertFalse((build_bin / "foo").exists())
             self.assertFalse((build_bin / "ar").exists())
             for shim in ("pacman", "pacman-conf", "cygpath", "uname"):
                 self.assertTrue((build_bin / shim).exists())
+
+    def test_exe_wins_bare_name_over_bat(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "foo.exe").touch()
+            (bin_dir / "foo.bat").touch()
+            build_bin = self._run(td)
+            foo = (build_bin / "foo").read_text()
+            self.assertIn("foo.exe", foo)
+            self.assertNotIn("cmd /c", foo)
+            self.assertIn("cmd /c", (build_bin / "foo.bat").read_text())
 
     def test_shim_names_win_over_exe(self):
         with tempfile.TemporaryDirectory() as td:
