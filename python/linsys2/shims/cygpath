@@ -82,7 +82,11 @@ def main():
             return to_unix(p)
         return to_windows(p, mixed=(mode == "mixed"))
 
+    if not paths:
+        sys.exit("cygpath: missing argument")
     for p in paths:
+        if not p:
+            sys.exit("cygpath: can't convert empty path")
         if path_list:
             if mode == "unix":
                 print(":".join(convert(e) for e in p.split(";") if e))

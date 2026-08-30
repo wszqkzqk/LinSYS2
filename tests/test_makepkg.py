@@ -409,6 +409,7 @@ class TestRunMakepkgGate(unittest.TestCase):
                                   Path(td) / "makepkg.conf"), \
                 mock.patch.object(cli_makepkg, "CONFIG_DIR",
                                   Path(td) / "config"), \
+                mock.patch.object(common, "DATA_DIR", Path(td) / "data"), \
                 mock.patch.object(cli_makepkg, "check_bwrap") as bwrap_mock, \
                 mock.patch.object(cli_makepkg.subprocess, "run") as run_mock:
             (Path(td) / "makepkg").touch()
@@ -428,6 +429,7 @@ class TestRunMakepkgGate(unittest.TestCase):
                                   Path(td) / "makepkg.conf"), \
                 mock.patch.object(cli_makepkg, "CONFIG_DIR",
                                   Path(td) / "config"), \
+                mock.patch.object(common, "DATA_DIR", Path(td) / "data"), \
                 mock.patch.object(cli_makepkg, "check_bwrap",
                                   return_value=False) as bwrap_mock, \
                 mock.patch.object(cli_makepkg.subprocess, "run") as run_mock:
@@ -451,6 +453,7 @@ class TestRunMakepkgGate(unittest.TestCase):
                                   Path(td) / "makepkg.conf"), \
                 mock.patch.object(cli_makepkg, "CONFIG_DIR",
                                   Path(td) / "config"), \
+                mock.patch.object(common, "DATA_DIR", Path(td) / "data"), \
                 mock.patch.object(cli_makepkg.shutil, "which",
                                   return_value=None), \
                 mock.patch.object(cli_makepkg, "check_bwrap",

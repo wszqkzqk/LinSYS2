@@ -49,6 +49,16 @@ class TestCygpath(unittest.TestCase):
     def test_unknown_option_fails(self):
         self.assertNotEqual(run("--bogus", "/x").returncode, 0)
 
+    def test_missing_argument_fails(self):
+        r = run("-u")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("missing argument", r.stderr)
+
+    def test_empty_path_fails(self):
+        r = run("-u", "")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("can't convert empty path", r.stderr)
+
     def test_double_dash(self):
         r = run("-w", "--", "/foo")
         self.assertEqual(r.stdout.strip(), "Z:\\foo")
