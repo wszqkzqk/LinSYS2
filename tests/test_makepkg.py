@@ -237,6 +237,11 @@ class TestBuildBin(unittest.TestCase):
             self.assertEqual(out.stdout.strip(), "x86_64")
             out = self._uname(build_bin, "--kernel-name")
             self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+            # Obsolescent but valid GNU aliases.
+            out = self._uname(build_bin, "--sysname")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+            out = self._uname(build_bin, "--release")
+            self.assertEqual(out.stdout.strip(), "3.6.10-8fbd9808.x86_64")
             out = self._uname(build_bin, "--operating-system")
             self.assertEqual(out.stdout.strip(), "Msys")
             out = self._uname(build_bin, "--version")
@@ -254,9 +259,6 @@ class TestBuildBin(unittest.TestCase):
             out = self._uname(build_bin, "--bogus")
             self.assertNotEqual(out.returncode, 0)
             self.assertIn("unrecognized option", out.stderr)
-            # Not a GNU option; real MSYS2 uname rejects it too.
-            out = self._uname(build_bin, "--sysname")
-            self.assertNotEqual(out.returncode, 0)
             out = self._uname(build_bin, "foo")
             self.assertNotEqual(out.returncode, 0)
             self.assertIn("extra operand", out.stderr)

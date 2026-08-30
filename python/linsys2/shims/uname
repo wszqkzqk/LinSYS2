@@ -12,9 +12,9 @@ ORDER = "snrvmpio"
 SHORT = set(ORDER)
 LONG = {
     "all": "a",
-    "kernel-name": "s",
+    "kernel-name": "s", "sysname": "s",
     "nodename": "n",
-    "kernel-release": "r",
+    "kernel-release": "r", "release": "r",
     "kernel-version": "v",
     "machine": "m",
     "processor": "p",
