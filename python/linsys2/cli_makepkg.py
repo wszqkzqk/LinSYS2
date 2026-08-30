@@ -314,46 +314,46 @@ def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
         error(f"environment '{env_name}' is in use by another linsys2-makepkg")
         return 1
 
-    wineprefix = resolve_wineprefix(env_name, wineprefix_arg)
-    ensure_wineprefix(wineprefix)
-    ensure_build_bin(env_name, wineprefix)
-
-    env = os.environ.copy()
-    env["MSYSTEM"] = env_cfg["msystem"]
-    env["CHERE_INVOKING"] = "1"
-    env["MSYS2_PACMAN_LINUX"] = "1"
-    env["LINSYS2_ENV"] = env_name
-    env["WINEPREFIX"] = str(wineprefix)
-    env["WINEPATH"] = winepath_of_bin_dir(env_name)
-    env["WINEDEBUG"] = "-all"
-    env["PANGOCAIRO_BACKEND"] = "fontconfig"
-    env["MAKEPKG_LIBRARY"] = str(LIBMAKEPKG_DIR)
-    # gcc -print-prog-name=ld yields a Z:/... path that native bash cannot
-    # execute; a bare name resolved via PATH makes libtool detect GNU ld
-    # instead of falling back to its MSVC branch.
-    env.setdefault("LD", "ld")
-    # libtool validates gcc's library search paths with test -d, which fails
-    # for the Z:/... forms; preseed the autoconf cache with the real
-    # (in-namespace) prefix paths instead.
-    prefix = env_cfg["install_prefix"]
-    env.setdefault(
-        "lt_cv_sys_lib_search_path_spec",
-        f"{prefix}/lib {prefix}/{env_cfg['chost']}/lib /usr/lib /lib",
-    )
-    # depfiles would contain Z:\... paths that native GNU make (built
-    # without HAVE_DOS_PATHS) cannot parse; one-shot package builds don't
-    # need header dependency tracking.
-    env.setdefault("am_cv_CC_dependencies_compiler_type", "none")
-    env.setdefault("am_cv_CXX_dependencies_compiler_type", "none")
-    if LIBALPM_DIR.exists():
-        old = env.get("LD_LIBRARY_PATH")
-        env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + (":" + old if old else "")
-    env["PATH"] = ":".join([str(get_build_bin_dir(env_name)),
-                            str(get_bin_dir(env_name)),
-                            env.get("PATH", "")])
-
-    cmd = [str(MAKEPKG_BIN), "--config", str(MAKEPKG_CONF)] + makepkg_args
     try:
+        wineprefix = resolve_wineprefix(env_name, wineprefix_arg)
+        ensure_wineprefix(wineprefix)
+        ensure_build_bin(env_name, wineprefix)
+
+        env = os.environ.copy()
+        env["MSYSTEM"] = env_cfg["msystem"]
+        env["CHERE_INVOKING"] = "1"
+        env["MSYS2_PACMAN_LINUX"] = "1"
+        env["LINSYS2_ENV"] = env_name
+        env["WINEPREFIX"] = str(wineprefix)
+        env["WINEPATH"] = winepath_of_bin_dir(env_name)
+        env["WINEDEBUG"] = "-all"
+        env["PANGOCAIRO_BACKEND"] = "fontconfig"
+        env["MAKEPKG_LIBRARY"] = str(LIBMAKEPKG_DIR)
+        # gcc -print-prog-name=ld yields a Z:/... path that native bash cannot
+        # execute; a bare name resolved via PATH makes libtool detect GNU ld
+        # instead of falling back to its MSVC branch.
+        env.setdefault("LD", "ld")
+        # libtool validates gcc's library search paths with test -d, which fails
+        # for the Z:/... forms; preseed the autoconf cache with the real
+        # (in-namespace) prefix paths instead.
+        prefix = env_cfg["install_prefix"]
+        env.setdefault(
+            "lt_cv_sys_lib_search_path_spec",
+            f"{prefix}/lib {prefix}/{env_cfg['chost']}/lib /usr/lib /lib",
+        )
+        # depfiles would contain Z:\... paths that native GNU make (built
+        # without HAVE_DOS_PATHS) cannot parse; one-shot package builds don't
+        # need header dependency tracking.
+        env.setdefault("am_cv_CC_dependencies_compiler_type", "none")
+        env.setdefault("am_cv_CXX_dependencies_compiler_type", "none")
+        if LIBALPM_DIR.exists():
+            old = env.get("LD_LIBRARY_PATH")
+            env["LD_LIBRARY_PATH"] = str(LIBALPM_DIR) + (":" + old if old else "")
+        env["PATH"] = ":".join([str(get_build_bin_dir(env_name)),
+                                str(get_bin_dir(env_name)),
+                                env.get("PATH", "")])
+
+        cmd = [str(MAKEPKG_BIN), "--config", str(MAKEPKG_CONF)] + makepkg_args
         return subprocess.run(build_bwrap_argv(env_name, cmd), env=env).returncode
     finally:
         os.close(lock_fd)
