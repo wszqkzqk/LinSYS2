@@ -184,6 +184,9 @@ def run_pacman(env_name, pacman_args):
         rc = subprocess.run(cmd, env=env).returncode
     except KeyboardInterrupt:
         return 130
+    except OSError as e:
+        error(f"failed to execute {pacman_bin}: {e}")
+        return 127
     # shell convention: killed by signal N -> 128+N
     return 128 - rc if rc < 0 else rc
 
