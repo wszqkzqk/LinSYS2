@@ -68,6 +68,7 @@ def _windows_path_of(linux_path, wineprefix):
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
     env["WINEDEBUG"] = "-all"
+    env["LC_ALL"] = "C.UTF-8"
     try:
         return subprocess.run(["winepath", "-w", str(linux_path)], env=env,
                               capture_output=True, encoding="utf-8",

@@ -57,6 +57,7 @@ def windows_version():
     env = os.environ.copy()
     env["WINEPREFIX"] = WINEPREFIX
     env["WINEDEBUG"] = "-all"
+    env["LC_ALL"] = "C.UTF-8"
     env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
     try:
         out = subprocess.run(["wine", "cmd", "/c", "ver"], env=env,
