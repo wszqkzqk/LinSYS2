@@ -64,7 +64,7 @@ def winepath_of_bin_dir(env_name):
 
 
 def _write_if_changed(path, content, mode=0o755):
-    if path.exists() and path.read_text() == content:
+    if path.exists() and path.read_text(errors="replace") == content:
         return
     path.write_text(content)
     path.chmod(mode)

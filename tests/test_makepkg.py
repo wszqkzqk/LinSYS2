@@ -77,6 +77,15 @@ class TestBuildBin(unittest.TestCase):
             self.assertTrue(blob.exists())
             self.assertTrue((build_bin / "gcc").exists())
 
+    def test_non_utf8_file_at_target_name_overwritten(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "gcc.exe").touch()
+            build_bin = self._run(td)
+            (build_bin / "gcc").write_bytes(b"\xff\xfe\x00\x01")
+            self._run(td)
+            self.assertIn(WRAPPER_MARKER, (build_bin / "gcc").read_text())
+
     def test_missing_bin_dir_only_shims(self):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
