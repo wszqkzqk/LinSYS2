@@ -49,7 +49,7 @@ class TestBuildBin(unittest.TestCase):
             self.assertIn("Z:\\", bat)
             self.assertFalse((build_bin / "foo").exists())
             self.assertFalse((build_bin / "ar").exists())
-            for shim in ("pacman", "pacman-conf", "cygpath", "uname"):
+            for shim in ("pacman", "pacman-conf", "cygpath", "uname", "arch"):
                 self.assertTrue((build_bin / shim).exists())
 
     def test_exe_wins_bare_name_over_bat(self):
@@ -125,7 +125,8 @@ class TestBuildBin(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
             self.assertEqual(sorted(p.name for p in build_bin.iterdir()),
-                             ["cygpath", "pacman", "pacman-conf", "uname"])
+                             ["arch", "cygpath", "pacman", "pacman-conf",
+                              "uname"])
 
     def test_custom_wineprefix_baked_into_wrappers(self):
         with tempfile.TemporaryDirectory() as td:
@@ -265,6 +266,20 @@ class TestBuildBin(unittest.TestCase):
             out = self._uname(build_bin, "--", "foo")
             self.assertNotEqual(out.returncode, 0)
             self.assertIn("extra operand", out.stderr)
+
+    def test_arch_shim(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            out = subprocess.run([str(build_bin / "arch")],
+                                 capture_output=True, text=True)
+            self.assertEqual(out.stdout.strip(), "x86_64")
+            out = subprocess.run([str(build_bin / "arch"), "--version"],
+                                 capture_output=True, text=True)
+            self.assertEqual(out.returncode, 0)
+            self.assertTrue(out.stdout.startswith("arch (GNU coreutils)"))
+            out = subprocess.run([str(build_bin / "arch"), "foo"],
+                                 capture_output=True, text=True)
+            self.assertNotEqual(out.returncode, 0)
 
 
 class TestPacmanAuth(unittest.TestCase):

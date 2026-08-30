@@ -48,7 +48,8 @@ There is NO WARRANTY, to the extent permitted by law.
 
 
 def die(msg):
-    sys.exit(f"uname: {msg}\nTry 'uname --help' for more information.")
+    prog = os.path.basename(sys.argv[0])
+    sys.exit(f"{prog}: {msg}\nTry '{prog} --help' for more information.")
 
 
 def windows_version():
@@ -68,6 +69,16 @@ def windows_version():
 
 
 def main():
+    if os.path.basename(sys.argv[0]) == "arch":
+        if sys.argv[1:] == ["--help"]:
+            print("Usage: arch [OPTION]...\nPrint machine architecture.")
+        elif sys.argv[1:] == ["--version"]:
+            print("arch (GNU coreutils) 8.32")
+        elif sys.argv[1:]:
+            die(f"extra operand '{sys.argv[1]}'")
+        else:
+            print(MACHINE)
+        return
     picked = set()
     operands = []
     after_ddash = False
