@@ -388,6 +388,7 @@ def cmd_run(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
@@ -425,6 +426,7 @@ def cmd_shell(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
+    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
