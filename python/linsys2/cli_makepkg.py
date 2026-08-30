@@ -63,6 +63,19 @@ def winepath_of_bin_dir(env_name):
     return "Z:" + str(get_bin_dir(env_name)).replace("/", "\\")
 
 
+def _windows_path_of(linux_path, wineprefix):
+    """linux_path as the prefix's Windows programs see it (via winepath)."""
+    env = os.environ.copy()
+    env["WINEPREFIX"] = str(wineprefix)
+    env["WINEDEBUG"] = "-all"
+    try:
+        return subprocess.run(["winepath", "-w", str(linux_path)], env=env,
+                              capture_output=True, text=True, check=True,
+                              timeout=30).stdout.strip()
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return "Z:" + str(linux_path).replace("/", "\\")
+
+
 def _write_if_changed(path, content, mode=0o755):
     if path.exists() and path.read_text(errors="replace") == content:
         return
@@ -115,7 +128,7 @@ def ensure_build_bin(env_name, wineprefix=None):
             elif lower.endswith((".bat", ".cmd")):
                 # Bare names resolve to .exe on MSYS2; .bat/.cmd stay explicit.
                 wrapper = name
-                win_path = "Z:" + str(entry).replace("/", "\\")
+                win_path = _windows_path_of(entry, wineprefix)
                 invoke = f"exec wine cmd /c {shlex.quote(win_path)} \"$@\"\n"
             else:
                 continue

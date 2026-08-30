@@ -35,7 +35,9 @@ class TestBuildBin(unittest.TestCase):
             (bin_dir / "g++.exe").touch()
             (bin_dir / "foo.bat").touch()
             (bin_dir / "ar").touch()  # real file, no wrapper needed
-            build_bin = self._run(td)
+            # No winepath on PATH: the Z: fallback must be used.
+            with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
+                build_bin = self._run(td)
 
             gcc = (build_bin / "gcc").read_text()
             self.assertIn(WRAPPER_MARKER, gcc)
@@ -55,11 +57,30 @@ class TestBuildBin(unittest.TestCase):
             bin_dir = self._make_env(td)
             (bin_dir / "foo.exe").touch()
             (bin_dir / "foo.bat").touch()
-            build_bin = self._run(td)
+            with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
+                build_bin = self._run(td)
             foo = (build_bin / "foo").read_text()
             self.assertIn("foo.exe", foo)
             self.assertNotIn("cmd /c", foo)
             self.assertIn("cmd /c", (build_bin / "foo.bat").read_text())
+
+    def test_bat_wrapper_uses_winepath(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "foo.bat").touch()
+            stub_dir = Path(td) / "stub"
+            stub_dir.mkdir()
+            log = Path(td) / "log"
+            (stub_dir / "winepath").write_text(
+                f"#!/bin/sh\necho \"$WINEPREFIX\" > '{log}'\n"
+                "printf 'Q:\\\\custom\\\\foo.bat\\n'\n")
+            (stub_dir / "winepath").chmod(0o755)
+            with mock.patch.dict(os.environ, {"PATH": str(stub_dir)}):
+                build_bin = self._run(td)
+            bat = (build_bin / "foo.bat").read_text()
+            self.assertIn("Q:\\custom\\foo.bat", bat)
+            self.assertEqual(log.read_text().strip(),
+                             str(Path(td) / "ucrt64" / "wine"))
 
     def test_shim_names_win_over_exe(self):
         with tempfile.TemporaryDirectory() as td:
