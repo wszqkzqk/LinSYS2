@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+def to_unix(path):
+    if len(path) >= 3 and path[1] == ":" and path[2] in "\\/":
+        drive = path[0].upper()
+        rest = path[2:].replace("\\", "/")
+        if drive == "Z":
+            return rest
+        wineprefix = os.environ.get("WINEPREFIX", "")
+        return wineprefix + "/drive_" + drive.lower() + rest
+    return path.replace("\\", "/")
+
+def to_windows(path, mixed=False):
+    if len(path) >= 3 and path[1] == ":" and path[2] in "\\/":
+        win = path
+    elif path.startswith("/"):
+        win = "Z:" + path
+    else:
+        win = path
+    return win.replace("\\", "/") if mixed else win.replace("/", "\\")
+
+def split_list(pathlist):
+    # A colon right after a lone drive letter is not a list separator.
+    parts = []
+    for fragment in pathlist.split(":"):
+        if parts and len(parts[-1]) == 1 and parts[-1].isalpha():
+            parts[-1] += ":" + fragment
+        else:
+            parts.append(fragment)
+    return parts
+
+def main():
+    mode = "unix"
+    absolute = False
+    path_list = False
+    paths = []
+    after_ddash = False
+    for arg in sys.argv[1:]:
+        if after_ddash:
+            paths.append(arg)
+            continue
+        if arg == "--":
+            after_ddash = True
+            continue
+        if arg.startswith("--"):
+            if arg == "--help":
+                print("usage: cygpath [-w|-u|-m] [-a] [-p] PATH...")
+                sys.exit(0)
+            if arg == "--version":
+                print("cygpath (linsys2 shim) 1.0")
+                sys.exit(0)
+            long_opts = {"--windows": "w", "--unix": "u", "--mixed": "m",
+                         "--absolute": "a", "--path": "p",
+                         "--long-name": "l", "--short-name": "s"}
+            if arg not in long_opts:
+                sys.exit(f"cygpath: unsupported option {arg}")
+            flags = long_opts[arg]
+        elif arg.startswith("-") and len(arg) > 1:
+            flags = arg[1:]
+        else:
+            paths.append(arg)
+            continue
+        for f in flags:
+            if f in "wum":
+                mode = {"w": "windows", "u": "unix", "m": "mixed"}[f]
+            elif f == "a":
+                absolute = True
+            elif f == "p":
+                path_list = True
+            elif f in "ls":
+                pass  # -l/-s only affect 8.3 names; irrelevant under Wine
+            else:
+                sys.exit(f"cygpath: unsupported option -{f}")
+
+    def convert(p):
+        # Drive-letter paths are already absolute; abspath would mangle them.
+        if absolute and not (len(p) >= 3 and p[1] == ":" and p[2] in "\\/"):
+            p = os.path.abspath(p)
+        if mode == "unix":
+            return to_unix(p)
+        return to_windows(p, mixed=(mode == "mixed"))
+
+    if not paths:
+        sys.exit("cygpath: missing argument")
+    for p in paths:
+        if not p:
+            sys.exit("cygpath: can't convert empty path")
+        if path_list:
+            if mode == "unix":
+                print(":".join(convert(e) for e in p.split(";") if e))
+            else:
+                print(";".join(convert(e) for e in split_list(p) if e))
+        else:
+            print(convert(p))
+
+main()

@@ -3,10 +3,14 @@ dist/
 build/
 *.tar.zst
 *.pkg.tar.*
+.stage/
 
 # Arch Linux makepkg directories
-/src/
 /pkg/
+/src/
+
+# Meson subproject lock
+subprojects/.wraplock
 
 *.log
 

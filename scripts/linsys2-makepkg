@@ -9,6 +9,6 @@ for _c in (_here.parent.parent / "lib" / "linsys2",   # installed: <prefix>/lib/
         sys.path.insert(0, str(_c))
         break
 
-from linsys2.cli_linsys2 import main
+from linsys2.cli_makepkg import main
 
 sys.exit(main())

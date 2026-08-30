@@ -3,16 +3,6 @@ name: Publish to AUR
 on:
   push:
     branches: [main, master]
-    paths:
-      - 'aur/PKGBUILD'
-      - 'Makefile'
-      - 'scripts/**'
-      - 'patches/**'
-      - 'vendor/msys2-pacman/**'
-      - 'vendor/msys2-keyring/**'
-      - '.gitmodules'
-      - 'README.md'
-      - 'COPYING'
   workflow_dispatch:
 
 env:
@@ -29,7 +19,7 @@ jobs:
           pacman -Syu --noconfirm git openssh
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 

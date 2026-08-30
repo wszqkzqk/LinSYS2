@@ -1,0 +1,3 @@
+option('system_prefix', type : 'string', value : '/usr',
+       description : 'prefix for the command entry points and Python package '
+                   + '(the pacman toolchain itself lives under prefix)')
