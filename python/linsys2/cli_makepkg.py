@@ -37,6 +37,7 @@ from linsys2.common import (
     MAKEPKG_BIN,
     MAKEPKG_CONF,
     PACMAN_CONF_BIN,
+    disable_winemenubuilder,
     error,
     get_bin_dir,
     get_env_dir,
@@ -91,7 +92,7 @@ def ensure_wineprefix(wineprefix):
         wineprefix.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env["WINEPREFIX"] = str(wineprefix)
-        env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
+        disable_winemenubuilder(env)
         env["WINEDEBUG"] = "-all"
         result = subprocess.run(["wineboot", "--init"], env=env, check=False)
         if result.returncode != 0:

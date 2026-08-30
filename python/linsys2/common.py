@@ -84,6 +84,14 @@ def error(msg):
     print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
 
 
+def disable_winemenubuilder(env):
+    """Prepend winemenubuilder.exe=d to WINEDLLOVERRIDES: our default
+    applies, but any user setting still wins on conflict (last wins)."""
+    existing = env.get("WINEDLLOVERRIDES")
+    env["WINEDLLOVERRIDES"] = ("winemenubuilder.exe=d" +
+                               (";" + existing if existing else ""))
+
+
 def get_env_dir(env_name):
     return DATA_DIR / env_name
 

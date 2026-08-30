@@ -58,7 +58,10 @@ def windows_version():
     env["WINEPREFIX"] = WINEPREFIX
     env["WINEDEBUG"] = "-all"
     env["LC_ALL"] = "C.UTF-8"
-    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
+    # Our default first, any user setting after: last wins on conflict.
+    env["WINEDLLOVERRIDES"] = (
+        "winemenubuilder.exe=d" +
+        (";" + env["WINEDLLOVERRIDES"] if env.get("WINEDLLOVERRIDES") else ""))
     try:
         out = subprocess.run(["wine", "cmd", "/c", "ver"], env=env,
                              capture_output=True, encoding="utf-8",

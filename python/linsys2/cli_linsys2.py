@@ -27,6 +27,7 @@ from linsys2 import __version__
 from linsys2.common import (
     DEFAULT_ENV,
     ENVIRONMENTS,
+    disable_winemenubuilder,
     error,
     get_bin_dir,
     info,
@@ -178,7 +179,7 @@ def cmd_init(args):
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
     # winemenubuilder would pollute the host with desktop/MIME entries
-    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
+    disable_winemenubuilder(env)
 
     info("Initializing Wine prefix...")
     result = subprocess.run(["wineboot", "--init"], env=env, check=False)
@@ -388,7 +389,7 @@ def cmd_run(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
-    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
+    disable_winemenubuilder(env)
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
@@ -426,7 +427,7 @@ def cmd_shell(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
-    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
+    disable_winemenubuilder(env)
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():

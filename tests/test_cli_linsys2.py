@@ -41,7 +41,7 @@ class TestWineEnv(unittest.TestCase):
             self.assertEqual(wine_env["WINEDLLOVERRIDES"],
                              "winemenubuilder.exe=d")
 
-    def test_run_keeps_user_winedlloverrides(self):
+    def test_run_merges_user_winedlloverrides(self):
         with tempfile.TemporaryDirectory() as td:
             _make_env(td)
             calls = []
@@ -56,7 +56,27 @@ class TestWineEnv(unittest.TestCase):
                               program="foo", args=[]))
             self.assertEqual(rc, 0)
             wine_env = next(kw["env"] for c, kw in calls if c[0] == "wine")
-            self.assertEqual(wine_env["WINEDLLOVERRIDES"], "d3d9=n")
+            self.assertEqual(wine_env["WINEDLLOVERRIDES"],
+                             "winemenubuilder.exe=d;d3d9=n")
+
+    def test_run_user_override_wins_on_conflict(self):
+        with tempfile.TemporaryDirectory() as td:
+            _make_env(td)
+            calls = []
+            with mock.patch.object(common, "DATA_DIR", Path(td)), \
+                    mock.patch.object(cli_linsys2, "ensure_wine"), \
+                    mock.patch.dict(
+                        os.environ,
+                        {"WINEDLLOVERRIDES": "winemenubuilder.exe=b"}), \
+                    mock.patch.object(cli_linsys2.subprocess, "run",
+                                      side_effect=_fake_run(calls)):
+                rc = cli_linsys2.cmd_run(
+                    Namespace(env="ucrt64", prefix=None,
+                              program="foo", args=[]))
+            self.assertEqual(rc, 0)
+            wine_env = next(kw["env"] for c, kw in calls if c[0] == "wine")
+            self.assertEqual(wine_env["WINEDLLOVERRIDES"],
+                             "winemenubuilder.exe=d;winemenubuilder.exe=b")
 
     def test_shell_disables_winemenubuilder(self):
         with tempfile.TemporaryDirectory() as td:
