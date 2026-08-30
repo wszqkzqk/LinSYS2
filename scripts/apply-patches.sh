@@ -27,12 +27,18 @@ fi
 needs_patch=1
 if [ -f "$stamp" ]; then
     needs_patch=0
-    for p in "$top"/patches/*.patch; do
-        if [ "$p" -nt "$stamp" ]; then
-            needs_patch=1
-            break
-        fi
-    done
+    # The stamp records the HEAD the patches were applied to.
+    sub_head=$(git -C "$sub" rev-parse HEAD 2>/dev/null) || true
+    if [ -n "$sub_head" ] && [ "$(cat "$stamp")" != "$sub_head" ]; then
+        needs_patch=1
+    else
+        for p in "$top"/patches/*.patch; do
+            if [ "$p" -nt "$stamp" ]; then
+                needs_patch=1
+                break
+            fi
+        done
+    fi
 fi
 
 if [ "$needs_patch" -eq 0 ]; then
@@ -44,4 +50,4 @@ git -C "$sub" checkout -- .
 for p in "$top"/patches/*.patch; do
     patch -p1 -d "$sub" --no-backup-if-mismatch -i "$p"
 done
-touch "$stamp"
+git -C "$sub" rev-parse HEAD > "$stamp"
