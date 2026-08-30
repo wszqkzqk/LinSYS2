@@ -180,12 +180,13 @@ def ensure_build_bin(env_name, wineprefix=None):
     _write_if_changed(build_bin / "arch", uname_shim)
 
 
-def check_bwrap():
+def check_bwrap(env_name):
     if shutil.which("bwrap"):
         return True
+    prefix = ENVIRONMENTS[env_name]["install_prefix"]
     error("bubblewrap (bwrap) not found.")
     error("linsys2-makepkg uses it to give the build a private filesystem")
-    error("view with the environment prefix at /ucrt64. Install bubblewrap.")
+    error(f"view with the environment prefix at {prefix}. Install bubblewrap.")
     return False
 
 
@@ -309,7 +310,7 @@ def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
         error(f"Environment not initialized: {env_name}")
         error(f"Run: linsys2-pacman init --env {env_name}")
         return 1
-    if not check_bwrap():
+    if not check_bwrap(env_name):
         return 1
     if not check_wine():
         return 1
@@ -359,7 +360,12 @@ def run_makepkg(env_name, makepkg_args, wineprefix_arg=None):
                                 env.get("PATH", "")])
 
         cmd = [str(MAKEPKG_BIN), "--config", str(MAKEPKG_CONF)] + makepkg_args
-        return subprocess.run(build_bwrap_argv(env_name, cmd), env=env).returncode
+        try:
+            rc = subprocess.run(build_bwrap_argv(env_name, cmd), env=env).returncode
+        except KeyboardInterrupt:
+            return 130
+        # shell convention: killed by signal N -> 128+N
+        return 128 - rc if rc < 0 else rc
     finally:
         os.close(lock_fd)
 
