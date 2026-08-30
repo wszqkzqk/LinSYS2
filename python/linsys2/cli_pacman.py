@@ -173,7 +173,12 @@ def run_pacman(env_name, pacman_args):
 
     cmd = [pacman_bin, "--config", str(config_file)] + pacman_args
     env = get_pacman_env()
-    return subprocess.run(cmd, env=env).returncode
+    try:
+        rc = subprocess.run(cmd, env=env).returncode
+    except KeyboardInterrupt:
+        return 130
+    # shell convention: killed by signal N -> 128+N
+    return 128 - rc if rc < 0 else rc
 
 
 def show_help():
@@ -260,7 +265,7 @@ def cmd_update_keyring(args):
         subprocess.run([pacman_key, "--config", str(config_file), "--populate", "msys2"],
                        env=env, check=True)
         info("Keyring updated successfully")
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, OSError) as e:
         error(f"Keyring update failed: {e}")
         return 1
     return 0
@@ -273,14 +278,6 @@ def main():
         show_help()
         return 0
 
-    if argv[0] in ("-h", "--help", "help"):
-        show_help()
-        return 0
-
-    if argv[0] in ("-V", "--version"):
-        print(f"LinSYS2 pacman wrapper {__version__}")
-        return 0
-
     env_choices = list(ENVIRONMENTS.keys())
 
     pre = argparse.ArgumentParser(add_help=False)
@@ -288,6 +285,14 @@ def main():
                      help=f"target environment (default: {DEFAULT_ENV})")
     pre_args, remaining = pre.parse_known_args(argv)
     env_name = pre_args.env
+
+    if remaining and remaining[0] in ("-h", "--help", "help"):
+        show_help()
+        return 0
+
+    if remaining and remaining[0] in ("-V", "--version"):
+        print(f"LinSYS2 pacman wrapper {__version__}")
+        return 0
 
     if remaining and remaining[0] in LINSYS2_SUBCOMMANDS:
         subcmd = remaining[0]
