@@ -49,6 +49,27 @@ class TestCygpath(unittest.TestCase):
     def test_unknown_option_fails(self):
         self.assertNotEqual(run("--bogus", "/x").returncode, 0)
 
+    def test_double_dash(self):
+        r = run("-w", "--", "/foo")
+        self.assertEqual(r.stdout.strip(), "Z:\\foo")
+        r = run("-u", "--", "Z:\\foo")
+        self.assertEqual(r.stdout.strip(), "/foo")
+        r = run("--", "-w")
+        self.assertEqual(r.stdout.strip(), "-w")
+
+    def test_absolute_windows_input(self):
+        r = run("-wa", "C:\\foo\\bar")
+        self.assertEqual(r.stdout.strip(), "C:\\foo\\bar")
+        env = os.environ.copy()
+        env["WINEPREFIX"] = "/wp"
+        r = run("-ua", "C:\\foo", env=env)
+        self.assertEqual(r.stdout.strip(), "/wp/drive_c/foo")
+
+    def test_absolute_relative_input(self):
+        r = run("-wa", "rel/path")
+        self.assertTrue(r.stdout.strip().startswith("Z:\\"))
+        self.assertTrue(r.stdout.strip().endswith("\\rel\\path"))
+
 
 if __name__ == "__main__":
     unittest.main()

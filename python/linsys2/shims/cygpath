@@ -36,7 +36,14 @@ def main():
     absolute = False
     path_list = False
     paths = []
+    after_ddash = False
     for arg in sys.argv[1:]:
+        if after_ddash:
+            paths.append(arg)
+            continue
+        if arg == "--":
+            after_ddash = True
+            continue
         if arg.startswith("--"):
             if arg == "--help":
                 print("usage: cygpath [-w|-u|-m] [-a] [-p] PATH...")
@@ -68,7 +75,8 @@ def main():
                 sys.exit(f"cygpath: unsupported option -{f}")
 
     def convert(p):
-        if absolute:
+        # Drive-letter paths are already absolute; abspath would mangle them.
+        if absolute and not (len(p) >= 3 and p[1] == ":" and p[2] in "\\/"):
             p = os.path.abspath(p)
         if mode == "unix":
             return to_unix(p)
