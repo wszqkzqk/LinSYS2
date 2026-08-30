@@ -169,5 +169,45 @@ class TestMain(unittest.TestCase):
                                    ["-Syu", "--help"])
 
 
+class TestCreateConfig(unittest.TestCase):
+    def test_creates_config_and_mirrorlist(self):
+        with tempfile.TemporaryDirectory() as td, _patch_dirs(td):
+            cli_pacman.create_config("ucrt64")
+            config = Path(td) / "config" / "ucrt64.conf"
+            self.assertIn("SigLevel     = Required DatabaseOptional",
+                          config.read_text())
+            self.assertIn("Server = ",
+                          (Path(td) / "config" / "mirrorlist.mingw")
+                          .read_text())
+
+    def test_pristine_files_rewritten_silently(self):
+        with tempfile.TemporaryDirectory() as td, _patch_dirs(td):
+            cli_pacman.create_config("ucrt64")
+            with mock.patch.object(cli_pacman, "info") as info_mock:
+                cli_pacman.create_config("ucrt64")
+            info_mock.assert_not_called()
+
+    def test_modified_config_gets_pacnew(self):
+        with tempfile.TemporaryDirectory() as td, _patch_dirs(td):
+            cli_pacman.create_config("ucrt64")
+            config = Path(td) / "config" / "ucrt64.conf"
+            config.write_text("# my custom config\n")
+            cli_pacman.create_config("ucrt64")
+            self.assertEqual(config.read_text(), "# my custom config\n")
+            pacnew = Path(td) / "config" / "ucrt64.conf.pacnew"
+            self.assertIn("SigLevel", pacnew.read_text())
+
+    def test_modified_mirrorlist_gets_pacnew(self):
+        with tempfile.TemporaryDirectory() as td, _patch_dirs(td):
+            cli_pacman.create_config("ucrt64")
+            mirrorlist = Path(td) / "config" / "mirrorlist.mingw"
+            mirrorlist.write_text("Server = https://my.mirror/\n")
+            cli_pacman.create_config("ucrt64")
+            self.assertEqual(mirrorlist.read_text(),
+                             "Server = https://my.mirror/\n")
+            pacnew = Path(td) / "config" / "mirrorlist.mingw.pacnew"
+            self.assertTrue(pacnew.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

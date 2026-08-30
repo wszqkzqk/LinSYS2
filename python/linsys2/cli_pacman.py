@@ -104,18 +104,28 @@ def get_db_dir(env_name):
     return get_env_dir(env_name) / "var" / "lib" / "pacman"
 
 
-def create_mirrorlist():
-    mirrorlist_file = CONFIG_DIR / "mirrorlist.mingw"
-    if mirrorlist_file.exists():
+def _write_default_file(path, content):
+    """Write a default config file pacnew-style: keep local modifications,
+    drop the new default next to them instead of clobbering."""
+    if path.exists():
+        if path.read_text() == content:
+            return
+        pacnew = path.parent / (path.name + ".pacnew")
+        with open(pacnew, "w") as f:
+            f.write(content)
+        info(f"Keeping modified configuration: {path}")
+        info(f"New default written to: {pacnew} (merge manually)")
         return
+    with open(path, "w") as f:
+        f.write(content)
+    info(f"Configuration created: {path}")
 
+
+def create_mirrorlist():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(mirrorlist_file, "w") as f:
-        f.write("##\n")
-        f.write("## MSYS2 MINGW Repository Mirrorlist\n")
-        f.write("##\n\n")
-        for mirror in MSYS2_MIRRORS:
-            f.write(f"Server = {mirror}\n")
+    content = ("##\n## MSYS2 MINGW Repository Mirrorlist\n##\n\n" +
+               "".join(f"Server = {mirror}\n" for mirror in MSYS2_MIRRORS))
+    _write_default_file(CONFIG_DIR / "mirrorlist.mingw", content)
 
 
 def create_config(env_name):
@@ -156,10 +166,7 @@ LocalFileSigLevel = Optional
 Include = {CONFIG_DIR / "mirrorlist.mingw"}
 """
 
-    with open(config_file, "w") as f:
-        f.write(config_content)
-
-    info(f"Configuration created: {config_file}")
+    _write_default_file(config_file, config_content)
 
 
 def run_pacman(env_name, pacman_args):
