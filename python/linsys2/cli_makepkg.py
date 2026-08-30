@@ -70,9 +70,10 @@ def _windows_path_of(linux_path, wineprefix):
     env["WINEDEBUG"] = "-all"
     try:
         return subprocess.run(["winepath", "-w", str(linux_path)], env=env,
-                              capture_output=True, text=True, check=True,
-                              timeout=30).stdout.strip()
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                              capture_output=True, encoding="utf-8",
+                              check=True, timeout=30).stdout.strip()
+    except (OSError, UnicodeDecodeError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
         return "Z:" + str(linux_path).replace("/", "\\")
 
 

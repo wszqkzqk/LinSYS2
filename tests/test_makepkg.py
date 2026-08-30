@@ -82,6 +82,19 @@ class TestBuildBin(unittest.TestCase):
             self.assertEqual(log.read_text().strip(),
                              str(Path(td) / "ucrt64" / "wine"))
 
+    def test_bat_wrapper_falls_back_on_non_utf8_winepath(self):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = self._make_env(td)
+            (bin_dir / "foo.bat").touch()
+            stub_dir = Path(td) / "stub"
+            stub_dir.mkdir()
+            (stub_dir / "winepath").write_text(
+                "#!/bin/sh\nprintf '\\377\\376\\n'\n")
+            (stub_dir / "winepath").chmod(0o755)
+            with mock.patch.dict(os.environ, {"PATH": str(stub_dir)}):
+                build_bin = self._run(td)
+            self.assertIn("Z:\\", (build_bin / "foo.bat").read_text())
+
     def test_shim_names_win_over_exe(self):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = self._make_env(td)
@@ -198,6 +211,20 @@ class TestBuildBin(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             build_bin = self._run(td)
             out = self._uname(build_bin, "-s", wine="garbage")
+            self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
+
+    def test_uname_shim_sysname_fallback_non_utf8(self):
+        with tempfile.TemporaryDirectory() as td:
+            build_bin = self._run(td)
+            stub_dir = Path(td) / "stub"
+            stub_dir.mkdir()
+            (stub_dir / "wine").write_text(
+                "#!/bin/sh\nprintf '\\377\\376\\n'\n")
+            (stub_dir / "wine").chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = stub_dir
+            out = subprocess.run([str(build_bin / "uname"), "-s"],
+                                 capture_output=True, text=True, env=env)
             self.assertEqual(out.stdout.strip(), "MINGW64_NT-10.0-19043")
 
     def test_uname_shim_combined_flags(self):

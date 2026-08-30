@@ -60,8 +60,8 @@ def windows_version():
     env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
     try:
         out = subprocess.run(["wine", "cmd", "/c", "ver"], env=env,
-                             capture_output=True, text=True, timeout=30,
-                             check=False)
+                             capture_output=True, encoding="utf-8",
+                             errors="replace", timeout=30, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return "10.0-19043"
     m = re.search(r"Windows\s+(\d+)\.(\d+)\.(\d+)", out.stdout)
