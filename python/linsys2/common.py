@@ -21,8 +21,10 @@ import platform
 import sys
 from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".config" / "linsys2"
-DATA_DIR = Path.home() / ".local" / "share" / "linsys2"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or
+                  Path.home() / ".config") / "linsys2"
+DATA_DIR = Path(os.environ.get("XDG_DATA_HOME") or
+                Path.home() / ".local" / "share") / "linsys2"
 
 try:
     from ._paths import BIN_DIR, PRIVATE_PREFIX

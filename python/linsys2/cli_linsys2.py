@@ -406,7 +406,12 @@ def cmd_run(args):
             warn("winepath failed; DLL search may be incomplete")
 
     cmd = ["wine", str(program_path)] + program_args
-    return subprocess.run(cmd, env=env).returncode
+    try:
+        rc = subprocess.run(cmd, env=env).returncode
+    except KeyboardInterrupt:
+        return 130
+    # shell convention: killed by signal N -> 128+N
+    return 128 - rc if rc < 0 else rc
 
 
 def cmd_shell(args):
@@ -450,7 +455,12 @@ def cmd_shell(args):
     info(f"WINEPREFIX: {wineprefix}")
     info(f"Type 'exit' to leave")
 
-    return subprocess.run([shell], env=env).returncode
+    try:
+        rc = subprocess.run([shell], env=env).returncode
+    except KeyboardInterrupt:
+        return 130
+    # shell convention: killed by signal N -> 128+N
+    return 128 - rc if rc < 0 else rc
 
 
 def main():

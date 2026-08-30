@@ -144,7 +144,7 @@ def ensure_build_bin(env_name, wineprefix=None):
                 f"#!/bin/sh\n{WRAPPER_MARKER}\n{exports}{invoke}",
             )
 
-    for stale in build_bin.iterdir():
+    for stale in list(build_bin.iterdir()):
         if stale.name in targets or not stale.is_file():
             continue
         try:
@@ -157,7 +157,8 @@ def ensure_build_bin(env_name, wineprefix=None):
     _write_if_changed(
         build_bin / "pacman",
         f"#!/bin/sh\n{WRAPPER_MARKER}\n"
-        f"exec {shlex.quote(str(BIN_DIR / 'linsys2-pacman'))} --env {env_name} \"$@\"\n",
+        f"exec {shlex.quote(sys.executable)} "
+        f"{shlex.quote(str(BIN_DIR / 'linsys2-pacman'))} --env {env_name} \"$@\"\n",
     )
     _write_if_changed(
         build_bin / "pacman-conf",
