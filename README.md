@@ -9,6 +9,8 @@
 
 LinSYS2 installs the [MSYS2](https://www.msys2.org/) Windows package ecosystem on Linux: the same Windows toolchain and libraries that run on Windows, executed through [Wine](https://www.winehq.org/). No VM, no dual-boot, no containers.
 
+It also builds MSYS2 packages on Linux: `linsys2-makepkg` compiles [MINGW-packages](https://github.com/msys2/MINGW-packages) PKGBUILDs natively, like MSYS2's `makepkg-mingw` but without Windows.
+
 ---
 
 ## Quick Start
@@ -30,12 +32,13 @@ linsys2 run -- gcc -v
 
 Traditional cross-compilation uses a Linux port of the MinGW toolchain: the build process differs from Windows, and you cannot run or debug the result.
 
-LinSYS2 installs the actual Windows toolchain from MSYS2, so compiling, debugging, and running work exactly as they do on Windows, from your Linux shell.
+LinSYS2 installs the actual Windows toolchain from MSYS2, so compiling, debugging, and running work exactly as they do on Windows, from your Linux shell. The same goes for packaging: `linsys2-makepkg` builds MSYS2's MINGW-packages PKGBUILDs on Linux, with the build behaving as it does on Windows.
 
 | | Traditional Cross-Compile | LinSYS2 |
 |---|---|---|
 | Build toolchain | Linux port of MinGW | Windows Compiler from MSYS2 |
 | Build behavior | May differ from Windows | Identical to Windows |
+| Build MSYS2 packages (PKGBUILD) | No | Yes (`linsys2-makepkg`) |
 | Run binaries | No | Yes (through Wine) |
 | Debug with Windows GDB | No | Yes |
 | Libraries | Linux-distro packaged | Identical to Windows |
@@ -46,6 +49,7 @@ LinSYS2 installs the actual Windows toolchain from MSYS2, so compiling, debuggin
 ## Features
 
 - Same toolchain as Windows: the Windows GCC/LLVM, GDB/LLDB, and CMake/Meson from MSYS2, not a Linux cross-compiler port
+- Build MSYS2 packages on Linux: `linsys2-makepkg` builds MINGW-packages PKGBUILDs natively, like `makepkg-mingw` (experimental)
 - Full dev lifecycle on Linux: install packages, compile, debug, run tests, and ship Windows binaries from your Linux shell
 - Runs through Wine at near-native speed, no VM or containers
 - Everything lives in `~/.local/share/linsys2/`, no root or system conflicts
