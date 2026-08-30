@@ -178,7 +178,7 @@ def cmd_init(args):
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
     # winemenubuilder would pollute the host with desktop/MIME entries
-    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
 
     info("Initializing Wine prefix...")
     result = subprocess.run(["wineboot", "--init"], env=env, check=False)
@@ -388,7 +388,7 @@ def cmd_run(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
-    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():
@@ -426,7 +426,7 @@ def cmd_shell(args):
 
     env = os.environ.copy()
     env["WINEPREFIX"] = str(wineprefix)
-    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+    env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
     env["PANGOCAIRO_BACKEND"] = "fontconfig"
 
     if bin_dir.exists():

@@ -89,7 +89,7 @@ def ensure_wineprefix(wineprefix):
         wineprefix.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env["WINEPREFIX"] = str(wineprefix)
-        env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+        env.setdefault("WINEDLLOVERRIDES", "winemenubuilder.exe=d")
         env["WINEDEBUG"] = "-all"
         result = subprocess.run(["wineboot", "--init"], env=env, check=False)
         if result.returncode != 0:
