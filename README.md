@@ -107,7 +107,7 @@ On Debian/Ubuntu:
 ```bash
 sudo apt install meson ninja-build gcc git patch pkg-config \
     libarchive-dev libarchive-tools libssl-dev libgpgme-dev libcurl4-openssl-dev \
-    bzip2 xz zstd curl \
+    bzip2 xz-utils zstd curl \
     gawk gettext which gnupg wine python3 bubblewrap
 ```
 
@@ -136,6 +136,9 @@ sudo meson install -C build
 ## Usage
 
 ### Package Management (`linsys2-pacman`)
+
+Run `init` and the following commands as a regular user, not root; the
+environment lives under `~/.local/share/linsys2` and `~/.config/linsys2`.
 
 ```bash
 # One-time setup

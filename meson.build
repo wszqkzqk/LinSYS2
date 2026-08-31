@@ -22,6 +22,7 @@ endforeach
 # Force the subproject prefix so its own project() defaults cannot win.
 subproject('msys2-pacman', default_options : [
   'prefix=' + get_option('prefix'),
+  'libdir=lib',
   'sysconfdir=etc',
   'localstatedir=var',
   'scriptlet-shell=/bin/bash',
