@@ -4,7 +4,8 @@ project('linsys2',
         meson_version : '>= 1.1.0',
         # prefix IS the toolchain's private home: every pacman install rule
         # then lands under it. system_prefix carries the system-facing entries.
-        default_options : ['prefix=/usr/lib/linsys2-pacman'])
+        default_options : ['prefix=/usr/lib/linsys2-pacman',
+                           'libdir=lib'])
 
 system_prefix = get_option('system_prefix')
 
