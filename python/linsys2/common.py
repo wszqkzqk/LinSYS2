@@ -109,9 +109,9 @@ def get_wineprefix(env_name):
 
 
 def resolve_wineprefix(env_name, prefix_arg=None, prefer_user=False):
-    """Resolve the Wine prefix for an environment: explicit argument,
-    optionally the user's own prefix, then a user-created wine.config
-    override, then the project-managed default."""
+    """Resolve the Wine prefix: explicit argument, optionally $WINEPREFIX,
+    a user-created wine.config override, then the fallback — ~/.wine with
+    prefer_user=True (even if not yet created), else the managed prefix."""
     if prefix_arg:
         return Path(prefix_arg)
 
@@ -119,9 +119,6 @@ def resolve_wineprefix(env_name, prefix_arg=None, prefer_user=False):
         user_wineprefix = os.environ.get("WINEPREFIX")
         if user_wineprefix:
             return Path(user_wineprefix)
-        default_wine = Path.home() / ".wine"
-        if default_wine.exists():
-            return default_wine
 
     config_file = get_env_dir(env_name) / "wine.config"
     if config_file.exists():
@@ -131,5 +128,8 @@ def resolve_wineprefix(env_name, prefix_arg=None, prefer_user=False):
                     parts = line.strip().split("=", 1)
                     if len(parts) == 2 and parts[1]:
                         return Path(parts[1])
+
+    if prefer_user:
+        return Path.home() / ".wine"
 
     return get_wineprefix(env_name)

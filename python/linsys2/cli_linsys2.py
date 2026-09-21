@@ -42,6 +42,15 @@ def ensure_wine():
         sys.exit(1)
 
 
+def _wine_env(wineprefix):
+    """Environment for wine calls against a prefix, winemenubuilder disabled."""
+    env = os.environ.copy()
+    env["WINEPREFIX"] = str(wineprefix)
+    env["LC_ALL"] = "C.UTF-8"
+    disable_winemenubuilder(env)
+    return env
+
+
 def winepath_unix_to_windows(unix_path, env=None):
     try:
         result = subprocess.run(
@@ -105,9 +114,7 @@ def _normalize_wine_path(path):
 def _register_bin_to_prefix(wineprefix, bin_dir):
     """Move the bin directory to the front of the prefix's registry PATH.
     Returns True if it already is at the front."""
-    env = os.environ.copy()
-    env["WINEPREFIX"] = str(wineprefix)
-    env["LC_ALL"] = "C.UTF-8"
+    env = _wine_env(wineprefix)
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
@@ -134,22 +141,17 @@ def _register_bin_to_prefix(wineprefix, bin_dir):
 def _set_pango_backend(wineprefix):
     """Force the fontconfig Pango backend: the PangoWin32 default bypasses
     Wine's FontSubstitutes/FontLink fallback mechanism."""
-    env = os.environ.copy()
-    env["WINEPREFIX"] = str(wineprefix)
-    env["LC_ALL"] = "C.UTF-8"
     subprocess.run(
         ["wine", "reg", "add", r"HKEY_CURRENT_USER\Environment",
          "/v", "PANGOCAIRO_BACKEND", "/t", "REG_SZ",
          "/d", "fontconfig", "/f"],
-        check=True, capture_output=True, env=env
+        check=True, capture_output=True, env=_wine_env(wineprefix)
     )
 
 
 def _delete_pango_backend(wineprefix):
     """Remove PANGOCAIRO_BACKEND only if we set it (value is 'fontconfig')."""
-    env = os.environ.copy()
-    env["WINEPREFIX"] = str(wineprefix)
-    env["LC_ALL"] = "C.UTF-8"
+    env = _wine_env(wineprefix)
 
     current = wine_registry_get(
         r"HKEY_CURRENT_USER\Environment",
@@ -209,8 +211,8 @@ def cmd_init(args):
 
 
 def cmd_register(args):
-    """Register the bin directory to the user's existing Wine prefix
-    ($WINEPREFIX or ~/.wine), not the project-managed one."""
+    """Register the bin directory to the user's Wine prefix ($WINEPREFIX
+    or ~/.wine), initializing the prefix first if needed."""
     env_name = args.env
     wineprefix = resolve_wineprefix(env_name, args.prefix, prefer_user=True)
     bin_dir = get_bin_dir(env_name)
@@ -221,6 +223,14 @@ def cmd_register(args):
         return 1
 
     ensure_wine()
+
+    if not wineprefix.exists():
+        info(f"Initializing Wine prefix: {wineprefix}")
+        wineprefix.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(["wineboot", "--init"],
+                                env=_wine_env(wineprefix), check=False)
+        if result.returncode != 0:
+            warn("wineboot failed; prefix may be incomplete")
 
     try:
         already = _register_bin_to_prefix(wineprefix, bin_dir)
@@ -245,16 +255,19 @@ def cmd_register(args):
 
 
 def cmd_unregister(args):
-    """Remove the bin directory from the user's existing Wine prefix."""
+    """Remove the bin directory from the user's Wine prefix."""
     env_name = args.env
     wineprefix = resolve_wineprefix(env_name, args.prefix, prefer_user=True)
     bin_dir = get_bin_dir(env_name)
 
+    if not wineprefix.exists():
+        warn(f"Wine prefix does not exist: {wineprefix}")
+        warn("Nothing to unregister")
+        return 0
+
     ensure_wine()
 
-    env = os.environ.copy()
-    env["WINEPREFIX"] = str(wineprefix)
-    env["LC_ALL"] = "C.UTF-8"
+    env = _wine_env(wineprefix)
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
@@ -316,11 +329,14 @@ def cmd_env(args):
     else:
         print(f"  Status:    not found")
 
+    if not wineprefix.exists():
+        print(f"\nWine prefix not initialized: {wineprefix}")
+        print(f"Run 'linsys2 register --env {env_name}' to create and register it")
+        return 0
+
     ensure_wine()
 
-    env = os.environ.copy()
-    env["WINEPREFIX"] = str(wineprefix)
-    env["LC_ALL"] = "C.UTF-8"
+    env = _wine_env(wineprefix)
 
     current_path = get_current_wine_path(env=env)
     win_bin_path = winepath_unix_to_windows(bin_dir, env=env)
