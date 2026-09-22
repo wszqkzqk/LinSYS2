@@ -97,5 +97,95 @@ class TestWineEnv(unittest.TestCase):
                              "winemenubuilder.exe=d")
 
 
+class TestRegister(unittest.TestCase):
+    def _run(self, func, td, ns, extra_env=None, home=None):
+        calls = []
+        env = extra_env if extra_env is not None else {}
+        patches = [
+            mock.patch.object(common, "DATA_DIR", Path(td)),
+            mock.patch.object(cli_linsys2, "ensure_wine"),
+            mock.patch.dict(os.environ, env, clear=True),
+            mock.patch.object(cli_linsys2.subprocess, "run",
+                              side_effect=_fake_run(calls)),
+        ]
+        if home is not None:
+            patches.append(mock.patch.object(Path, "home", return_value=home))
+        for p in patches:
+            p.start()
+        try:
+            rc = func(ns)
+        finally:
+            for p in reversed(patches):
+                p.stop()
+        return rc, calls
+
+    def test_register_defaults_to_home_wine(self):
+        with tempfile.TemporaryDirectory() as td:
+            _make_env(td)
+            home = Path(td) / "home"
+            home.mkdir()
+            rc, calls = self._run(
+                cli_linsys2.cmd_register, td,
+                Namespace(env="ucrt64", prefix=None), home=home)
+            self.assertEqual(rc, 0)
+            cmds = [c for c, _ in calls]
+            self.assertIn(["wineboot", "--init"], cmds)
+            self.assertTrue(any(c[:3] == ["wine", "reg", "add"] for c in cmds))
+            for _, kw in calls:
+                self.assertEqual(kw["env"]["WINEPREFIX"], str(home / ".wine"))
+            self.assertFalse((Path(td) / "ucrt64" / "wine").exists())
+
+    def test_register_initializes_uninitialized_prefix(self):
+        with tempfile.TemporaryDirectory() as td:
+            _make_env(td)
+            target = Path(td) / "fresh-prefix"
+            rc, calls = self._run(
+                cli_linsys2.cmd_register, td,
+                Namespace(env="ucrt64", prefix=str(target)))
+            self.assertEqual(rc, 0)
+            cmds = [c for c, _ in calls]
+            self.assertIn(["wineboot", "--init"], cmds)
+            for _, kw in calls:
+                self.assertEqual(kw["env"]["WINEPREFIX"], str(target))
+
+    def test_register_into_existing_prefix(self):
+        with tempfile.TemporaryDirectory() as td:
+            _make_env(td)
+            prefix = Path(td) / "user-wine"
+            prefix.mkdir()
+            rc, calls = self._run(
+                cli_linsys2.cmd_register, td,
+                Namespace(env="ucrt64", prefix=str(prefix)))
+            self.assertEqual(rc, 0)
+            cmds = [c for c, _ in calls]
+            self.assertNotIn(["wineboot", "--init"], cmds)
+            self.assertTrue(any(c[:3] == ["wine", "reg", "add"] for c in cmds))
+            for _, kw in calls:
+                self.assertEqual(kw["env"]["WINEPREFIX"], str(prefix))
+                self.assertEqual(kw["env"]["WINEDLLOVERRIDES"],
+                                 "winemenubuilder.exe=d")
+
+    def test_unregister_without_existing_prefix_is_noop(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            rc, calls = self._run(
+                cli_linsys2.cmd_unregister, td,
+                Namespace(env="ucrt64", prefix=None), home=home)
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [])
+
+    def test_env_uninitialized_prefix_has_no_side_effects(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            rc, calls = self._run(
+                cli_linsys2.cmd_env, td,
+                Namespace(env="ucrt64", prefix=None), home=home)
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [])
+            self.assertFalse((home / ".wine").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

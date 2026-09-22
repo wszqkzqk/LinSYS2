@@ -201,6 +201,8 @@ linsys2 env         # inspect registration
 linsys2 unregister  # remove from Wine PATH
 ```
 
+These commands only ever target your own Wine prefix (`--prefix`, `$WINEPREFIX`, or the default `~/.wine`, initialized on demand if it does not exist yet). The isolated project prefix needs no registration and is never modified implicitly.
+
 ### Building Packages (`linsys2-makepkg`, experimental)
 
 `linsys2-makepkg` is experimental: many packages build fine, but expect rough edges and per-package quirks.
